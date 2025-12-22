@@ -1,0 +1,25 @@
+{
+  "name": "web-capture",
+  "version": "1.0.0",
+  "packageManager": "npm@11.6.4",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PriyeshPandey2000/Web-capture.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/PriyeshPandey2000/Web-capture/issues"
+  },
+  "homepage": "https://github.com/PriyeshPandey2000/Web-capture#readme",
+  "devDependencies": {
+    "turbo": "^2.7.1"
+  }
+}
