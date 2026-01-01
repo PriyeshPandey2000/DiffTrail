@@ -1,8 +1,8 @@
 import express from 'express';
 import {chromium} from 'playwright';
-const app=express();
-app.use(express.json());
-app.get('/',(req,res)=>res.send("server running"));
+import {app} from './app.js'
+
+
 app.post('/screenshot',async (req,res)=>{
 const url=req.body.url;
 const browser= await chromium.launch();
