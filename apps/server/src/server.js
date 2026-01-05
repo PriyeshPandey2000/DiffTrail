@@ -1,4 +1,5 @@
-
+import 'dotenv/config';
+// console.log(process.env)
 import {app} from './app.js'
 
 
