@@ -2,7 +2,7 @@ import { Groq } from 'groq-sdk';
 import 'dotenv/config';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-export async function processScreenshot(ariaSnapshot) {
+export async function processScreenshot(ariaSnapshot,base64Image) {
   const chatCompletion = await groq.chat.completions.create({
     "messages": [
       {
@@ -15,7 +15,7 @@ export async function processScreenshot(ariaSnapshot) {
           {
             "type": "image_url",
             "image_url": {
-              "url": "https://fastly.picsum.photos/id/237/200/300.jpg?hmac=TmmQSbShHz9CdQm0NkEjx1Dyh_Y984R9LpNrpvH2D_U"
+              "url": `data:image/jpeg;base64,${base64Image}`
             }
           }
         ]
@@ -53,7 +53,7 @@ export async function processScreenshot(ariaSnapshot) {
     "stop": null
   });
 
-   console.log(chatCompletion.choices[0].message.content);
+   return(chatCompletion.choices[0].message.content);
 }
 
-processScreenshot();
+// processScreenshot();
