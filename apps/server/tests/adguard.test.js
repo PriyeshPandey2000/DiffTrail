@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
-import { access } from 'node:fs/promises';
+import { access, copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { before, after, test } from 'node:test';
 import { createCaptureService } from '../src/services/capture.js';
 import { createAdguardContext, selectFilters } from '../src/services/adguard-context.js';
@@ -81,4 +84,32 @@ test('persistent profiles do not leak cookies or storage to the next native work
     assert.equal(await page.evaluate(()=>localStorage.getItem('private-test')),null);
     assert.equal((await next.context.cookies()).some(cookie=>cookie.name==='private_test'),false);
   }finally{await next.close();}
+});
+
+test('native cleanup loads from a checkout path containing spaces and Unicode', { skip: !enabled }, async () => {
+  // Exercise real Chromium loading, not just URL conversion: an encoded path
+  // passes the build checksum check but prevents the extension from starting.
+  const project = await mkdtemp(resolve(tmpdir(), 'difftrail space é-'));
+  const services = resolve(project, 'apps/server/src/services');
+  const cache = resolve(project, '.cache/adguard-runtime');
+  let worker;
+  try {
+    await mkdir(services, { recursive: true });
+    await mkdir(cache, { recursive: true });
+    await writeFile(resolve(project, 'package.json'), '{"type":"module"}');
+    await symlink(fileURLToPath(new URL('../../../node_modules', import.meta.url)), resolve(project, 'node_modules'), 'dir');
+    await symlink(fileURLToPath(new URL('../../../.cache/adguard-runtime/extension', import.meta.url)), resolve(cache, 'extension'), 'dir');
+    for (const name of ['adguard-context.js', 'options.js']) {
+      await copyFile(new URL(`../src/services/${name}`, import.meta.url), resolve(services, name));
+    }
+    const { createAdguardContext: createFromCheckout } = await import(pathToFileURL(resolve(services, 'adguard-context.js')).href);
+    worker = await createFromCheckout({ cookies: true, popups: true }, { timeoutMs: 10_000 });
+    const page = await worker.context.newPage();
+    await page.goto(origin);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#cookie-banner')).display === 'none');
+    assert.equal(await page.locator('main').isVisible(), true);
+    assert.deepEqual(worker.metadata.filters, [18, 19]);
+  } finally {
+    try { await worker?.close(); } finally { await rm(project, { recursive: true, force: true }); }
+  }
 });

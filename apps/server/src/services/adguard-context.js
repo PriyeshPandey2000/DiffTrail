@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CaptureError } from './options.js';
 
 export const filterCategories = Object.freeze({
@@ -12,6 +13,7 @@ export const filterCategories = Object.freeze({
 export const selectFilters = categories => [...new Set(Object.entries(filterCategories)
   .filter(([key]) => categories[key]).flatMap(([, ids]) => ids))].sort((a, b) => a - b);
 const directory = new URL('../../../../.cache/adguard-runtime/extension/', import.meta.url);
+const extensionPath = fileURLToPath(directory);
 const sha256 = data => createHash('sha256').update(data).digest('hex');
 let verified;
 async function loadBuild() {
@@ -47,7 +49,7 @@ export async function createAdguardContext(categories, { timeoutMs = 25_000, hea
       context = await chromium.launchPersistentContext(profile, {
         channel: 'chromium', headless, timeout: Math.min(10_000, timeoutMs),
         viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, acceptDownloads: false,
-        args: [`--disable-extensions-except=${directory.pathname}`, `--load-extension=${directory.pathname}`],
+        args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
       });
       const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: Math.max(1, timeoutMs - (Date.now() - started)) });
       const id = new URL(worker.url()).host;

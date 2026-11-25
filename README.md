@@ -104,7 +104,7 @@ npm run smoke:api -- onetrust cookiebot guardian booking
 The normal suite includes the retained cosmetic-candidate regressions; that candidate is not the API default. Real native-runtime tests are explicit because they require the generated extension assets. Tests need no AI key or credits. Live checks are not CI gates.
 
 GitHub Actions installs Chromium with Linux dependencies, builds the pinned
-AdGuard runtime and runs `test:adguard`, including the three native checks.
+AdGuard runtime and runs `test:adguard`, including native path and isolation checks.
 `npm run audit:dependencies` fails for new advisories while displaying the
 reviewed, unresolved Zod finding described in [dependency review](docs/dependency-audit.md).
 
