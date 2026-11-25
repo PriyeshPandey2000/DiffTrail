@@ -5,7 +5,7 @@ import { before, after, test } from 'node:test';
 import { chromium } from 'playwright';
 import type { Browser } from 'playwright';
 import { normalizeOptions } from '../src/services/options.ts';
-import { preparePage } from '../src/services/loading.ts';
+import { preparePage, waitForImages } from '../src/services/loading.ts';
 import { createCaptureService } from '../src/services/capture.ts';
 import { createApp } from '../src/app.ts';
 
@@ -15,6 +15,8 @@ let origin: string;
 before(async () => {
   browser = await chromium.launch();
   server = http.createServer((req, res) => {
+    if (req.url === '/broken.png') { res.writeHead(404); res.end(); return; }
+    if (req.url === '/image.svg') { setTimeout(() => { if (!res.destroyed) { res.setHeader('Content-Type', 'image/svg+xml'); res.end('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="green"/></svg>'); } }, 250); return; }
     if (req.url === '/pending.png') return; // Never finish this subresource.
     res.setHeader('Content-Type', 'text/html');
     res.end((req.url === '/tall' ? '<body style="height:4000px">' : '<body>') + '<h1>Ready</h1>' + (req.url === '/heavy' ? '<img src="/pending.png">' : '') + '</body>');
@@ -37,6 +39,10 @@ test('loading defaults are stable and normalization is idempotent', () => {
   assert.equal(defaults.delay, 0);
   assert.equal(defaults.scroll, false);
   assert.equal(defaults.timeout, undefined);
+  assert.notEqual(normalizeOptions({ url: origin, fullPage: true }).scroll, false);
+  assert.equal(normalizeOptions({ url: origin, fullPage: true, scroll: false }).scroll, false);
+  const full = normalizeOptions({ url: origin, fullPage: true });
+  assert.deepEqual(normalizeOptions(full), full);
   const resolved = normalizeOptions({ url: origin, waitUntil: 'networkidle', timeout: 60000, delay: 150,
     waitForSelector: '.ready', scroll: true, viewport: { height: 400 } });
   assert.deepEqual(resolved.scroll, { step: 320, delay: 200, maxSteps: 30 });
@@ -117,4 +123,35 @@ test('request deadlines include selector waits and delay and release capacity af
     await assert.rejects(capture({ url: origin, waitForSelector: '[' }), { code: 'INVALID_OPTIONS', status: 400 });
     assert.equal((await capture({ url: origin })).cleanup, 'skipped');
   } finally { await capture.close(); }
+});
+
+
+test('image readiness waits for lazy images, records failures, and stops at its budget', async () => {
+  const page = await browser.newPage({ viewport: { width: 600, height: 400 } });
+  try {
+    await page.goto(origin);
+    await page.setContent(`<img width="100" height="100" data-src="${origin}/image.svg"><img width="50" height="50" src="${origin}/broken.png"><img width="50" height="50" src="${origin}/pending.png"><script>setTimeout(()=>document.querySelector('[data-src]').src=document.querySelector('[data-src]').dataset.src,50)</script>`, { waitUntil: 'domcontentloaded' });
+    const result = await waitForImages(page, normalizeOptions({ url: origin }), 700);
+    assert.equal(result.state, 'incomplete');
+    assert.equal(result.loaded, 1);
+    assert.equal(result.failed, 1);
+    assert.equal(result.pending, 1);
+    assert.equal(result.untriggered, 0);
+    assert.ok(result.elapsedMs >= 650 && result.elapsedMs < 2000);
+  } finally { await page.close(); }
+});
+
+test('ready pages return promptly and ignore images beyond the capture region', async () => {
+  const page = await browser.newPage({ viewport: { width: 600, height: 400 } });
+  try {
+    await page.goto(origin);
+    await page.setContent(`<p>No relevant pending images</p><img src="${origin}/pending.png" style="position:absolute;top:1500px;width:100px;height:100px">`, { waitUntil: 'domcontentloaded' });
+    const result = await waitForImages(page, normalizeOptions({ url: origin }), 1500);
+    assert.equal(result.state, 'ready');
+    assert.equal(result.pending, 0);
+    assert.ok(result.elapsedMs < 1000);
+    const capped = await waitForImages(page, normalizeOptions({ url: origin, fullPage: true, maxHeight: 500 }), 1500);
+    assert.equal(capped.state, 'ready');
+    assert.equal(capped.pending, 0);
+  } finally { await page.close(); }
 });

@@ -8,7 +8,16 @@ export interface Viewport { width: number; height: number }
 export type WaitUntil = 'load' | 'domcontentloaded' | 'networkidle';
 export interface ScrollOptions { step?: number; delay?: number; maxSteps?: number }
 export interface ResolvedScroll { step: number; delay: number; maxSteps: number }
+export interface ImageReadiness {
+  state: 'ready' | 'incomplete' | 'unknown';
+  loaded: number;
+  failed: number;
+  pending: number;
+  untriggered: number;
+  elapsedMs: number;
+}
 export interface LoadingMetadata {
+  images?: ImageReadiness;
   waitUntil: WaitUntil;
   delay: number;
   timeout: number;
@@ -27,6 +36,8 @@ export interface CaptureRequest {
   ai?: false;
   format?: OutputFormat | 'jpg';
   quality?: number;
+  scale?: 1 | 2;
+  maxHeight?: number;
   fullPage?: boolean;
   viewport?: Partial<Viewport>;
 }
@@ -43,17 +54,22 @@ export interface CaptureOptions {
   ai: false;
   format: OutputFormat;
   quality?: number;
+  scale: 1 | 2;
+  maxHeight?: number;
   fullPage: boolean;
   viewport: Viewport;
 }
 export interface ImageOutput {
   format: OutputFormat;
   quality?: number;
+  scale: 1 | 2;
+  maxHeight?: number;
   fullPage: boolean;
   viewport: Viewport;
   // CSS px height of the page; only measured for full-page captures.
   pageHeight?: number;
   truncated: boolean;
+  truncationReasons?: ('max-height' | 'format-limit' | 'pixel-budget')[];
 }
 export interface Residual {
   state: 'not-checked' | 'none-detected' | 'suspected' | 'unknown' | 'blocked';

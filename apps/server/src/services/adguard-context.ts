@@ -50,7 +50,7 @@ async function loadBuild() {
 
 // Fresh persistent profile per capture. Extension storage and website storage
 // never cross requests. No pool of previously visited profiles is maintained.
-export async function createAdguardContext(categories: Partial<CleanupCategories>, { timeoutMs = 25_000, headless = true, viewport = DEFAULT_VIEWPORT }: { timeoutMs?: number; headless?: boolean; viewport?: Viewport } = {}): Promise<AdguardWorker<BrowserContext>> {
+export async function createAdguardContext(categories: Partial<CleanupCategories>, { timeoutMs = 25_000, headless = true, viewport = DEFAULT_VIEWPORT, scale = SCALE }: { timeoutMs?: number; headless?: boolean; viewport?: Viewport; scale?: 1 | 2 } = {}): Promise<AdguardWorker<BrowserContext>> {
   const started = Date.now();
   let build;
   try { build = await loadBuild(); }
@@ -66,7 +66,7 @@ export async function createAdguardContext(categories: Partial<CleanupCategories
     const initialize = async (): Promise<AdguardWorker<BrowserContext>> => {
       context = await chromium.launchPersistentContext(profile, {
         channel: 'chromium', headless, timeout: Math.min(10_000, timeoutMs),
-        viewport, deviceScaleFactor: SCALE, acceptDownloads: false,
+        viewport, deviceScaleFactor: scale, acceptDownloads: false,
         args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
       });
       const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: Math.max(1, timeoutMs - (Date.now() - started)) });

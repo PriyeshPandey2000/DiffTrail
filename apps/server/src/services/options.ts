@@ -1,6 +1,6 @@
 import type { CaptureOptions, CleanupCategories, CleanupCategory, Viewport, WaitUntil, ResolvedScroll } from './types.ts';
 
-import { DEFAULT_FORMAT, DEFAULT_QUALITY, DEFAULT_VIEWPORT, OUTPUT_FORMATS, VIEWPORT_LIMITS } from './output.ts';
+import { DEFAULT_FORMAT, DEFAULT_QUALITY, DEFAULT_VIEWPORT, OUTPUT_FORMATS, VIEWPORT_LIMITS, SCALE } from './output.ts';
 
 export class CaptureError extends Error {
   declare code: string;
@@ -19,8 +19,8 @@ export function normalizeOptions(input: unknown): CaptureOptions {
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid('Provide a JSON object.');
   const options = input as Record<string, unknown>;
   if (Object.hasOwn(options, 'clean')) invalid('clean was replaced. Use cleanup:"standard" or cleanup:"none". No AI is called.');
-  if (Object.keys(options).some(key => !['url', 'cleanup', 'consent', 'ai', 'format', 'quality', 'fullPage', 'viewport', 'waitUntil', 'delay', 'waitForSelector', 'timeout', 'scroll'].includes(key))) {
-    invalid('Unknown option. Supported options: url, cleanup, consent, ai, format, quality, fullPage, viewport, waitUntil, delay, waitForSelector, timeout, scroll.');
+  if (Object.keys(options).some(key => !['url', 'cleanup', 'consent', 'ai', 'format', 'quality', 'fullPage', 'viewport', 'waitUntil', 'delay', 'waitForSelector', 'timeout', 'scroll', 'scale', 'maxHeight'].includes(key))) {
+    invalid('Unknown option. Supported options: url, cleanup, consent, ai, format, quality, fullPage, viewport, waitUntil, delay, waitForSelector, timeout, scroll, scale, maxHeight.');
   }
   let target;
   try { target = new URL(typeof options.url === 'string' ? options.url : ''); } catch { /* handled below */ }
@@ -69,7 +69,11 @@ function normalizeOutput(options: Record<string, unknown>, invalid: (message: st
     if (!Number.isInteger(value) || (value as number) < min || (value as number) > max) invalid(`viewport.${key} must be an integer from ${min} to ${max}.`);
     viewport[key] = value as number;
   }
-  return { format, ...(quality === undefined ? {} : { quality }), fullPage: options.fullPage === true, viewport };
+  const scale = options.scale === undefined ? SCALE : options.scale;
+  if (scale !== 1 && scale !== 2) invalid('scale must be 1 or 2.');
+  const maxHeight = options.maxHeight;
+  if (maxHeight !== undefined && (options.fullPage !== true || typeof maxHeight !== 'number' || !Number.isInteger(maxHeight) || maxHeight < 1 || maxHeight > 100_000)) invalid('maxHeight requires fullPage:true and must be an integer from 1 to 100000 CSS pixels.');
+  return { scale: scale as 1 | 2, ...(maxHeight === undefined ? {} : { maxHeight: maxHeight as number }), format, ...(quality === undefined ? {} : { quality }), fullPage: options.fullPage === true, viewport };
 }
 
 function normalizeLoading(options: Record<string, unknown>, invalid: (message: string) => never, viewport: Viewport): Pick<CaptureOptions, 'waitUntil' | 'delay' | 'timeout' | 'waitForSelector' | 'scroll'> {
@@ -85,8 +89,8 @@ function normalizeLoading(options: Record<string, unknown>, invalid: (message: s
   const selector = options.waitForSelector;
   if (selector !== undefined && (typeof selector !== 'string' || !selector.trim() || selector.length > 1000)) invalid('waitForSelector must be a non-empty CSS selector of at most 1000 characters.');
   let scroll: false | ResolvedScroll = false;
-  if (options.scroll !== undefined && options.scroll !== false) {
-    const value = options.scroll === true ? {} : options.scroll;
+  if (options.scroll !== false && (options.scroll !== undefined || options.fullPage === true)) {
+    const value = options.scroll === true || options.scroll === undefined ? {} : options.scroll;
     if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !['step', 'delay', 'maxSteps'].includes(key))) invalid('scroll must be a boolean or an object with step, delay, and maxSteps.');
     const config = value as Record<string, unknown>;
     scroll = { step: integer(config.step, Math.min(800, Math.floor(viewport.height * 0.8)), 100, 2000, 'scroll.step'), delay: integer(config.delay, 200, 0, 1000, 'scroll.delay'), maxSteps: integer(config.maxSteps, 30, 1, 100, 'scroll.maxSteps') };

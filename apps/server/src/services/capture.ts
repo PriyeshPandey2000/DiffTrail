@@ -5,15 +5,15 @@ import { chromium } from 'playwright';
 import { loadBlocker, applyCosmetics, inspectPage, attachNetworkBlocking } from './blocker.ts';
 import { createAdguardContext } from './adguard-context.ts';
 import { CaptureError, normalizeOptions } from './options.ts';
-import { preparePage } from './loading.ts';
-import { OUTPUT_FORMATS, SCALE, renderImage } from './output.ts';
+import { preparePage, waitForImages } from './loading.ts';
+import { OUTPUT_FORMATS, renderImage } from './output.ts';
 export { CaptureError } from './options.ts';
 
 export interface CaptureServiceOptions {
   browserType?: BrowserLauncher;
   headless?: boolean;
   cleanupEngine?: 'adguard' | 'cosmetic';
-  adguardFactory?: (categories: CleanupCategories, options: { headless: boolean; timeoutMs: number; viewport: Viewport }) => Promise<AdguardWorker>;
+  adguardFactory?: (categories: CleanupCategories, options: { headless: boolean; timeoutMs: number; viewport: Viewport; scale: 1 | 2 }) => Promise<AdguardWorker>;
   blockerLoader?: typeof loadBlocker;
   maxConcurrent?: number;
   captureTimeout?: number;
@@ -95,14 +95,14 @@ export function createCaptureService({
       }
       ensureActive();
       if (requested && cleanupEngine === 'adguard') {
-        nativeWorker = await adguardFactory(options.cleanup, { headless, timeoutMs: Math.max(1, requestTimeout - (Date.now() - start)), viewport: options.viewport });
+        nativeWorker = await adguardFactory(options.cleanup, { headless, timeoutMs: Math.max(1, requestTimeout - (Date.now() - start)), viewport: options.viewport, scale: options.scale });
         context = nativeWorker.context;
       } else {
         const instance = await getBrowser();
         ensureActive();
         uses++;
         context = await instance.newContext({
-          viewport: options.viewport, deviceScaleFactor: SCALE,
+          viewport: options.viewport, deviceScaleFactor: options.scale,
           serviceWorkers: 'block', acceptDownloads: false,
         });
       }
@@ -156,6 +156,8 @@ export function createCaptureService({
             residual = { state: 'unknown', signals: [...residual.signals, 'incomplete-application'] };
           }
         }
+        ensureActive();
+        loading.images = await waitForImages(page, options, Math.min(1500, Math.max(0, requestTimeout - (Date.now() - start))));
         ensureActive();
         // Full pages can take several seconds to encode; they may use the rest of the deadline.
         const { image, output } = await renderImage(page, options, options.fullPage ? Math.max(1000, requestTimeout - (Date.now() - start)) : 5000);
