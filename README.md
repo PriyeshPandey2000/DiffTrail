@@ -1,21 +1,44 @@
 # DiffTrail — Website Screenshot API
 
-A screenshot API for capturing web pages with configurable cookie-banner, popup, and ad blocking. Built with TypeScript, Playwright, and AdGuard.
+Capture website screenshots as PNG, JPEG, or WebP through a local HTTP API. DiffTrail supports full-page screenshots, CSS element capture, rectangle cropping, and configurable cookie-banner, popup, and ad blocking.
 
-## See cleanup in action
+Built with TypeScript, Playwright, and AdGuard. Runs in headless Chromium by default.
 
-Real captures of live sites through DiffTrail, with the same request except `cleanup`.
+## Features
 
-| Raw capture · `cleanup:"none"` | Cookie and popup filtering · `cleanup:"standard"` |
-| :---: | :---: |
-| <img src="docs/images/trustarc-raw.png" width="400" alt="Raw screenshot of trustarc.com with a cookie consent bar across the bottom"> | <img src="docs/images/trustarc-standard.png" width="400" alt="Screenshot of trustarc.com with the cookie consent bar removed"> |
-| <img src="docs/images/ikea-raw.png" width="400" alt="Raw screenshot of ikea.com/gb with a cookie dialog over the hero banner"> | <img src="docs/images/ikea-standard.png" width="400" alt="Screenshot of ikea.com/gb with the cookie dialog removed"> |
+- Viewport, full-page, element, and rectangle screenshots.
+- PNG, JPEG, and WebP output with quality controls for JPEG and WebP.
+- Custom viewport sizes and 1× or 2× pixel density.
+- Cookie-banner, popup, ad, and other filtering categories.
+- Page readiness controls: selector waits, delays, and lazy-load scrolling.
+- Capture and cleanup metadata in response headers.
 
-Captured 25 November 2026 from one network at 1920×1080. Filtering varies by site and visit; page content such as carousels and lazy-loaded images can also differ between captures.
+## Quick start
 
-## Take a screenshot
+Requires Node.js 22.18+, npm 10.9.11, and `unzip`.
 
-With the [API running](#getting-started), send a URL and choose a cleanup preset:
+```sh
+git clone https://github.com/PriyeshPandey2000/DiffTrail.git
+cd DiffTrail
+npm ci
+npm run setup:adguard
+cp .env.example .env
+npm start
+```
+
+The API listens at `http://127.0.0.1:3000`. Set `PORT` in `.env` to change the port. For captures without filtering, replace `setup:adguard` with `setup:browser`.
+
+On Linux, install Chromium's system dependencies before starting:
+
+```sh
+npm exec --workspace=server -- playwright install --with-deps chromium
+```
+
+Windows users can run these commands in WSL2.
+
+## Take a website screenshot
+
+Send a JSON body to `POST /api/screenshot`. The response contains the image bytes.
 
 ```sh
 curl --fail-with-body http://127.0.0.1:3000/api/screenshot \
@@ -24,113 +47,99 @@ curl --fail-with-body http://127.0.0.1:3000/api/screenshot \
   --output screenshot.png
 ```
 
-Open `screenshot.png` in your image viewer (`open screenshot.png` on macOS). Errors return JSON, so check that curl succeeded before opening the file.
+Open `screenshot.png` in your image viewer. On macOS, run `open screenshot.png`. Errors return JSON; only open the output as an image if curl succeeds.
 
-### Wait for page content
+Defaults: PNG, a 1920×1080 CSS viewport, 2× density, and a 30-second request deadline. Cleanup is off unless requested. The default output size is 3840×2160 pixels.
 
-Use loading controls for pages with delayed content or lazy-loaded images:
+Use the following JSON bodies with the same endpoint. Match the output filename to the requested format.
+
+### Full-page screenshots
 
 ```json
-{"url":"https://example.com","fullPage":true,"waitUntil":"domcontentloaded","scroll":true,"delay":1000,"timeout":60000}
+{"url":"https://example.com","fullPage":true,"maxHeight":6000,"cleanup":"standard"}
 ```
 
-Pixel density stays at 2× by default; use `scale:1` for smaller images. Full-page requests scroll automatically unless `scroll:false` is passed, and captures briefly wait for relevant images within a bounded budget. You can also wait for a visible CSS selector with `waitForSelector`. See [loading controls](docs/api.md#loading-controls) for options, bounds, and timeout behavior.
+Full-page mode scrolls automatically to trigger lazy-loaded content. Use `scroll:false` to disable it. `maxHeight` caps the height in CSS pixels; format and output-pixel limits also apply. A limited capture reports `X-DiffTrail-Truncated: true`.
 
-### Capture an element or rectangle
+### Capture an element
 
 ```json
 {"url":"https://example.com","selector":"h1","cleanup":"standard"}
 ```
 
+`selector` captures the first matching CSS element, scrolling it into view if needed. Use a selector from the page source or browser DevTools. Missing or hidden targets return an error instead of a viewport screenshot.
+
+### Crop a rectangle
+
 ```json
-{"url":"https://example.com","clip":{"x":100,"y":200,"width":600,"height":400}}
+{"url":"https://example.com","clip":{"x":100,"y":100,"width":600,"height":400}}
 ```
 
-Selectors capture the first match. Rectangles use document CSS pixels; the default 2× density doubles output dimensions. Missing targets and invalid bounds return errors. See [element and rectangle capture](docs/api.md#element-and-rectangle-capture) for loading behavior and limits.
+Coordinates are CSS pixels from the document's top-left. This rectangle produces a 1200×800 image at the default 2× density. `selector`, `clip`, and `fullPage:true` cannot be combined.
 
-## Features
+See [element and rectangle capture](docs/api.md#element-and-rectangle-capture) for bounds, nested scrolling, and selector support.
 
-- Capture URLs as PNG, JPEG, or WebP, at a chosen viewport size or as a full page.
-- Capture a specific element or a rectangle using document coordinates.
-- Choose raw screenshots, cleanup presets, or individual filter categories.
-- Run headless or open a visible browser for debugging.
-- Inspect cleanup status, residual UI signals, and timings in response headers.
-- Isolate cookies and storage between captures.
+### Choose format, size, and density
 
-Cleanup uses bundled, maintained AdGuard filters. No API key is required.
-
-## Use cases
-
-- **Website previews:** generate page thumbnails for bookmarks, directories, and link cards.
-- **Documentation:** capture web pages for guides and automated documentation workflows.
-- **Visual archives:** save PNG snapshots of a page at a point in time.
-- **AI workflows:** supply webpage screenshots as image inputs to vision models and agents.
-
-## Getting started
-
-Requirements: Node.js 22.18+, npm 10.9.11, and `unzip`.
-
-```sh
-npm ci
-npm run setup:adguard
-cp .env.example .env
-npm start
+```json
+{"url":"https://example.com","format":"webp","quality":75,"viewport":{"width":1280,"height":720},"scale":1}
 ```
 
-The API runs at `http://127.0.0.1:3000`. Set `PORT` in `.env` to change the port. Setup installs Chromium and builds the bundled filtering runtime. For raw screenshots only, use `npm run setup:browser` instead.
+Use `format:"jpeg"` for JPEG output. `quality` applies only to JPEG and WebP. `scale:1` produces one image pixel per CSS pixel; `scale:2` doubles each output dimension without changing the CSS viewport.
 
-On Linux, install Chromium’s system dependencies with:
+### Wait for dynamic content
 
-```sh
-npm exec --workspace=server -- playwright install --with-deps chromium
+```json
+{"url":"https://example.com","waitUntil":"domcontentloaded","waitForSelector":"h1","delay":500,"timeout":60000}
 ```
 
-Windows contributors can use WSL2.
+Durations are in milliseconds. `waitUntil` also accepts `load` (the default) and `networkidle`. `waitForSelector` waits for visibility but does not crop the screenshot; use `selector` to select the output area. Captures also briefly wait for relevant images. See [loading controls](docs/api.md#loading-controls) for scrolling options and timeout behavior.
 
-## Cleanup options
+## Block cookie banners, popups, and ads
+
+Filtering uses maintained AdGuard rules and requires no API key.
 
 | `cleanup` | Behavior |
 | --- | --- |
-| Omitted or `"none"` | Raw screenshot; this is the default. |
-| `"standard"` | Cookie-banner and popup filters. |
-| `"all"` | All supported filter categories. |
-| An object | Enable specific categories; omitted categories are off. |
+| Omitted or `"none"` | Capture without filtering; the default. |
+| `"standard"` | Enable cookie-banner and popup filters. |
+| `"all"` | Enable all supported filter categories. |
+| An object | Enable individual categories; omitted categories are off. |
+
+For example, enable cookie, popup, and ad filters:
 
 ```json
-{"url":"https://example.com","cleanup":{"cookies":true,"popups":true,"ads":false}}
+{"url":"https://example.com","cleanup":{"cookies":true,"popups":true,"ads":true}}
 ```
 
-Filtering can change page content and layout. AdGuard’s cookie rules can interact with consent banners. Coverage varies by website.
+| Without filtering | `cleanup:"standard"` |
+| :---: | :---: |
+| <img src="docs/images/trustarc-raw.png" width="400" alt="Website screenshot of TrustArc with a cookie banner"> | <img src="docs/images/trustarc-standard.png" width="400" alt="Website screenshot of TrustArc with the cookie banner removed by DiffTrail"> |
 
-See the [API reference](docs/api.md) for all categories, response headers, errors, and resource limits.
+Filtering varies by site and can change page content or layout. AdGuard's cookie rules can interact with consent banners. See the [API reference](docs/api.md) for all categories and response metadata.
+
+## Documentation
+
+- [API reference](docs/api.md): request options, defaults, headers, errors, and limits.
+- [Element and rectangle capture](docs/api.md#element-and-rectangle-capture).
+- [Loading controls](docs/api.md#loading-controls).
+- [Deployment notes](docs/api.md#errors-and-resource-limits): the server currently binds to loopback for local use.
 
 ## Development
 
 ```sh
-npm run dev              # Watch and run TypeScript source
+npm run dev              # Run TypeScript source with file watching
 npm run typecheck        # Check source and test types
-npm run build            # Compile the server into apps/server/dist
-npm test                 # Build and run local fixture tests
-npm run test:adguard     # Include native AdGuard integration tests after setup
+npm run build            # Compile the server
+npm test                 # Run local fixture tests
+npm run test:adguard      # Run fixtures including native AdGuard checks
 npm run audit:dependencies
 ```
 
-`npm start` builds and runs the compiled server. GitHub Actions runs type checking, compilation, the dependency audit, and fixture and native integration tests.
-
-To debug captures in a visible browser:
+Run `npm run setup:adguard` before native integration tests. To inspect captures in a visible browser:
 
 ```sh
 DIFFTRAIL_HEADLESS=false npm start
 ```
 
-Use [the benchmark guide](docs/benchmarks.md) for manual comparison tooling. Live-site benchmarks are separate from the automated test suite.
-
-## Current scope
-
-DiffTrail supports viewport and full-page screenshots as PNG, JPEG, or WebP. Caching, consent-rejection automation, and AI cleanup are not implemented.
-
-The server binds to loopback and is intended for local development. Public hosting still requires authentication, outbound network isolation, abuse controls, and resolution of the advisory in the [dependency review](docs/dependency-audit.md).
-
-## Contributing
-
-Use TypeScript for server changes, include relevant fixture checks, and follow [AGENTS.md](AGENTS.md) for verification and pull request conventions. Keep generated browser profiles, screenshots, and benchmark artifacts out of commits.
+Contributions are welcome. Follow [AGENTS.md](AGENTS.md) for checks and pull request conventions.
