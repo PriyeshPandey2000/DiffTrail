@@ -1,11 +1,13 @@
-import express from 'express';
-import { normalizeOptions } from '../../services/options.js';
+import type { CaptureHandler } from '../../services/types.ts';
 
-export function createScreenshotRouter({ capture }) {
+import express from 'express';
+import { normalizeOptions } from '../../services/options.ts';
+
+export function createScreenshotRouter({ capture }: { capture: CaptureHandler }) {
   const router = express.Router();
   router.post('/screenshot', async (req, res, next) => {
     try {
-      const options = normalizeOptions(req.body);
+      const options = normalizeOptions(req.body as unknown);
       const { image, cleanup, metadata } = await capture(options);
       res.set({
         'Content-Type': 'image/png', 'Cache-Control': 'no-store',

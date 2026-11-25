@@ -1,6 +1,6 @@
 import { Groq } from 'groq-sdk';
 
-export async function processScreenshot(ariaSnapshot, base64Image) {
+export async function processScreenshot(ariaSnapshot: string, base64Image: string): Promise<unknown> {
   // Construct lazily so ordinary captures never require an API key.
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 10_000, maxRetries: 0 });
   const completion = await groq.chat.completions.create({
@@ -22,5 +22,6 @@ export async function processScreenshot(ariaSnapshot, base64Image) {
     temperature: 0,
     max_completion_tokens: 1024,
   });
-  return JSON.parse(completion.choices[0].message.content);
+  const content = completion.choices[0].message.content;
+  return content === null ? null : JSON.parse(content);
 }

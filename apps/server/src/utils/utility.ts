@@ -2,7 +2,7 @@ import fs from 'fs';
 
 
 
-export function pngToBase64(filePath){
+export function pngToBase64(filePath: fs.PathOrFileDescriptor){
     try{
         const bits=fs.readFileSync(filePath);
         return bits.toString('base64');

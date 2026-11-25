@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url';
 config({ path: fileURLToPath(new URL('../../../.env', import.meta.url)), quiet: true });
 
 // Construct the capture service only after loading environment configuration.
-const { createApp } = await import('./app.js');
-const app = createApp();
+const { createApp } = await import('./app.ts');
+const { createCaptureService } = await import('./services/capture.ts');
+const capture = createCaptureService();
+const app = createApp({ capture });
 
 const port = Number(process.env.PORT || 3000);
 // Development server: public hosting needs network isolation and authentication.
@@ -15,7 +17,7 @@ async function shutdown() {
   if (stopping) return;
   stopping = true;
   server.close();
-  await app.locals.capture.close();
+  await capture.close();
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

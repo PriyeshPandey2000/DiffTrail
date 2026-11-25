@@ -69,4 +69,4 @@ npm run benchmark:compare
 node apps/server/benchmarks/comparison-report.js artifacts/blocker-comparison/<timestamp>
 ```
 
-No extension-store login, personal browser installation, API key, or manual remote-debugging setup is required. Native macOS and the optional Linux container path were exercised. See README for Linux dependencies, WSL/Docker guidance, selected-site runs, exact preset differences, and the optional Docker benchmark command. New runs are unscored until their screenshots are reviewed and a `review.json` is authored.
+No extension-store login, personal browser installation, API key, or manual remote-debugging setup is required. Native macOS and the optional Linux container path were exercised. See the [benchmark guide](benchmarks.md) for Linux dependencies, WSL/Docker guidance, selected-site runs, exact preset differences, and the optional Docker benchmark command. New runs are unscored until their screenshots are reviewed and a `review.json` is authored.

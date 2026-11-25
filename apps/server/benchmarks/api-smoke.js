@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/app.ts';
 
 // Functional smoke through the actual HTTP route. Raw captures have no cleanup
 // wait, so these pairs are not a matched efficacy or visual-fidelity benchmark.

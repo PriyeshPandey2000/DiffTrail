@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { gzipSync, gunzipSync } from 'node:zlib';
-import { selectRule } from '../src/services/filter-policy.js';
+import { selectRule } from '../src/services/filter-policy.ts';
 
 const destination = new URL('../resources/filters/', import.meta.url);
 const ids = { cookies: 18, popups: 19, chat: 22, ads: 2 };

@@ -27,6 +27,8 @@ jobs:
       - name: Use the pinned npm version
         run: npm install --global npm@10.9.11
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
       - name: Check dependency advisories
         run: npm run audit:dependencies
       - name: Install Chromium and Linux dependencies
