@@ -9,6 +9,17 @@ export async function validateSelectors(page: CapturePage, options: CaptureOptio
     if (selector === undefined) continue;
     const valid = await page.evaluate(value => { try { document.querySelector(value); return true; } catch { return false; } }, selector);
     if (!valid) throw new CaptureError('INVALID_OPTIONS', `${key} must be a valid CSS selector.`, 400);
+    try {
+      // Browser CSS and Playwright's parser accept different syntax. Count on
+      // the blank page validates the actual capture engine without waiting.
+      await targetLocator(page, selector).count();
+    } catch (error) {
+      if (error instanceof Error && /while parsing css selector/i.test(error.message)) {
+        throw new CaptureError('INVALID_OPTIONS', `${key} must be a CSS selector supported by Playwright.`, 400);
+      }
+      // Browser closure and protocol errors are capture failures, not bad input.
+      throw error;
+    }
   }
 }
 
@@ -42,7 +53,11 @@ export async function targetBounds(page: CapturePage, options: CaptureOptions): 
   if (options.selector === undefined) return;
   // Read position and scroll offset together: scroll anchoring can move both
   // between separate protocol calls while a lazy page grows (e.g. Amazon).
-  const box = await targetLocator(page, options.selector).evaluate(element => {
+  // evaluateAll does not wait for a missing match. Initial readiness was already
+  // checked; a target removed during cleanup must fail as 422, not a timeout.
+  const box = await targetLocator(page, options.selector).evaluateAll(elements => {
+    const element = elements[0];
+    if (!element || getComputedStyle(element).visibility === 'hidden') return null;
     const rect = element.getBoundingClientRect();
     return { x: rect.x + scrollX, y: rect.y + scrollY, width: rect.width, height: rect.height };
   });

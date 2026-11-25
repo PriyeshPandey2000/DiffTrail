@@ -7,6 +7,7 @@ import type { Browser } from 'playwright';
 import { createApp } from '../src/app.ts';
 import { createCaptureService } from '../src/services/capture.ts';
 import { normalizeOptions } from '../src/services/options.ts';
+import { prepareTarget, targetBounds } from '../src/services/target.ts';
 import type { CaptureMetadata } from '../src/services/types.ts';
 
 let browser: Browser;
@@ -84,7 +85,8 @@ test('target validation rejects malformed and conflicting options before navigat
     { clip: { x: 0, y: 0.5, width: 1, height: 1 } }, { clip: { x: 0, y: 0, width: '10', height: 1 } },
     { clip: { x: 0, y: 0, width: 10, height: 10, extra: true } }, { selector: '.card', fullPage: true },
     { clip: { x: 0, y: 0, width: 10, height: 10 }, fullPage: true }, { selector: '.card', clip: { x: 0, y: 0, width: 10, height: 10 } },
-    { selector: 'div[' }, { selector: 'text=foo' }, { selector: 'div >> text=foo' }];
+    { selector: 'div[' }, { selector: 'text=foo' }, { selector: 'div >> text=foo' },
+    ...['div::before', '*|div', '::part(x)', '&'].flatMap(selector => [{ selector }, { waitForSelector: selector }])];
   const before = targetRequests;
   for (const body of bad) { const result = await post(body); assert.equal(result.status, 400, JSON.stringify(body)); }
   assert.equal(targetRequests, before);
@@ -100,6 +102,26 @@ test('selector captures the first match below the fold at both densities', async
     assert.deepEqual(metadata(result).output.target, { mode: 'selector', bounds: { x: 0, y: 1500, width: 300, height: 160 } });
     await image(result, 300 * scale, 160 * scale, [0, 128, 0]);
   }
+});
+
+test('a target removed or hidden after readiness returns 422 without waiting for a match', async () => {
+  const page = await browser.newPage();
+  const options = normalizeOptions({ url: origin, selector: '#promo' });
+  try {
+    for (const action of ['remove', 'hide']) {
+      await page.setContent('<div id="promo" style="width:100px;height:50px">Promo</div>');
+      await prepareTarget(page, options, 1000);
+      await page.evaluate(action => {
+        const element = document.querySelector<HTMLElement>('#promo')!;
+        if (action === 'remove') element.remove();
+        else element.style.visibility = 'hidden';
+      }, action);
+      // A short page timeout would turn the previous evaluate() implementation
+      // into a TimeoutError, so this distinguishes the 422 path without sleeps.
+      page.setDefaultTimeout(100);
+      await assert.rejects(targetBounds(page, options), { code: 'TARGET_NOT_VISIBLE', status: 422 });
+    }
+  } finally { await page.close(); }
 });
 
 test('selector waits for delayed visibility and scrolls nested containers', async () => {

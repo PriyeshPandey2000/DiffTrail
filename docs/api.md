@@ -76,7 +76,7 @@ curl --fail-with-body http://127.0.0.1:3000/api/screenshot \
   --output heading.png
 ```
 
-`selector` accepts non-empty CSS of at most 1,000 characters. XPath, Playwright selector engines, frame traversal, and closed shadow roots are not supported. Get a CSS selector from your page source or browser DevTools. If the first match is hidden, a later visible match is not substituted.
+`selector` accepts non-empty CSS of at most 1,000 characters. Both browser CSS and Playwright parser validation run before navigation; unsupported syntax returns 400. XPath, Playwright selector engines, frame traversal, and closed shadow roots are not supported. Get a CSS selector from your page source or browser DevTools. If the first match is hidden, a later visible match is not substituted.
 
 DiffTrail waits up to five seconds for that first match to become visible and stable enough to scroll into view, including scrolling nested containers. The total request deadline still applies. It then runs the requested cleanup and bounded image-readiness check. Final bounds are resolved again before capture, with another target wait of at most five seconds. A missing/hidden/unstable target returns `422 TARGET_NOT_VISIBLE` when this target wait expires; the overall request deadline still returns 504. There is no fallback to a viewport image.
 
@@ -92,7 +92,7 @@ Rules for both modes:
 
 - `selector`, `clip`, and `fullPage:true` are mutually exclusive. Conflicts and malformed options return 400. `maxHeight` remains full-page-only.
 - Existing format, quality, viewport, density, loading controls, and cleanup options remain available. Omit both target options for the existing viewport/full-page behavior.
-- Cleanup runs before final target measurement. It can change layout or hide the requested target; a target hidden by cleanup fails rather than falling back.
+- Cleanup runs before final target measurement. It can change layout, hide, or remove the requested target; a target absent or hidden at measurement returns `422 TARGET_NOT_VISIBLE` without another wait for it to appear.
 - A region extending outside the document returns `422 TARGET_OUT_OF_BOUNDS`. Format-side and output-pixel limits apply to both dimensions; oversized targets return `422 TARGET_TOO_LARGE` rather than being silently truncated or downscaled.
 - The response remains image bytes. `output.target` in `X-DiffTrail-Metadata` records `mode` (`selector` or `clip`) and measured document-relative CSS `bounds`. The selector string is not echoed into headers. `output.fullPage` and `output.truncated` are false for targeted output.
 
