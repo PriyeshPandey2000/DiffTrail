@@ -44,6 +44,12 @@ AI remains off. `consent:"none"` means no additional rejection layer; **AdGuardâ
 
 The SDK does not supply verified hidden-element counts. The API reports these as null and uses `enabled` to mean the engine was configured, with residual status recorded separately. Residual detection is bounded and read-only. Core native behavior is not filtered through our earlier custom safety/geometry guards.
 
+## Visible-browser access check
+
+Product Hunt was checked through the screenshot API in both modes. The headless request received Cloudflare HTTP 403 with `cf-mitigated: challenge` and remained on verification after ten seconds. The headful request loaded the real page and returned PNG. This is an observation from those visits, not a guarantee that visible-browser mode bypasses access restrictions.
+
+Upstream failures include `upstreamStatus` and, when explicitly identified by the response header, `reason:"browser-verification"`. Error bodies remain JSON. See the [API reference](api.md).
+
 ## Validation and remaining limits
 
 The normal suite covers the retained cosmetic candidate, validation, PNG delivery, isolation, deadlines and raw browser lifecycle. `npm run test:adguard` also exercises the real official headless runtime, category readiness, delayed banners and cross-request cookie/storage isolation. See README for the current commands and test output.

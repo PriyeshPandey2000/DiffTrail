@@ -60,7 +60,7 @@ Cookie dialogs were not necessarily present immediately: the original per-second
 
 ## Reproduce
 
-See the README's experimental benchmark section. Setup uses public release assets, not an extension-store session. No customer or contributor has to install anything in their personal browser. Ordinary local execution requires Node 22+, unzip, and Playwright's OS dependencies; the optional Dockerfile supplies a Linux environment.
+See the [benchmark guide](benchmarks.md). Setup uses public release assets, not an extension-store session. No customer or contributor has to install anything in their personal browser. Ordinary local execution requires Node 22.18+, unzip, and Playwright's OS dependencies; the optional Dockerfile supplies a Linux environment.
 
 ```sh
 npm ci
