@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fieldnotes — DiffTrail screenshot demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f5f3ed; color: #23362c; font-family: Arial, sans-serif; }
+    header { margin: 0 100px; height: 140px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #d4d9cd; }
+    .brand { font-size: 34px; font-weight: 700; letter-spacing: -1px; }
+    .nav { display: flex; gap: 48px; font-size: 20px; }
+    main { padding: 74px 100px 100px; }
+    .eyebrow { font-size: 16px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+    h1 { margin: 22px 0; font-size: 94px; line-height: 1.04; letter-spacing: -5px; font-weight: 500; }
+    .intro { margin: 0; max-width: 760px; color: #58665c; font-size: 26px; line-height: 1.5; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 54px; }
+    .card { border: 1px solid #d4d9cd; background: #fbfaf6; }
+    .art { height: 185px; overflow: hidden; position: relative; background: #d4dec8; }
+    .art::before { content: ''; position: absolute; width: 200px; height: 200px; border: 40px solid #50664a; border-radius: 50%; left: 65px; top: 30px; }
+    .card:nth-child(2) .art { background: #dfc9b8; }
+    .card:nth-child(2) .art::before { border-color: #a66e4d; border-radius: 0; transform: rotate(32deg); top: 55px; left: 175px; }
+    .card:nth-child(3) .art { background: #c8d7dd; }
+    .card:nth-child(3) .art::before { border-color: #567982; width: 330px; height: 140px; border-radius: 100px; left: 105px; top: 65px; }
+    .card-copy { padding: 25px 28px 30px; }
+    .card-copy span { color: #687465; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; }
+    h2 { margin: 14px 0 0; font-size: 30px; font-weight: 500; }
+    #cookie-banner { position: fixed; inset: auto 0 0; z-index: 100; background: #243e33; color: #fff; padding: 38px 100px; display: flex; justify-content: space-between; align-items: center; gap: 50px; box-shadow: 0 -15px 60px #15261e26; }
+    #cookie-banner h2 { margin: 0 0 12px; font-size: 30px; }
+    #cookie-banner p { margin: 0; max-width: 960px; font-size: 21px; line-height: 1.5; color: #d4e0d7; }
+    .actions { display: flex; gap: 16px; flex-shrink: 0; }
+    button { padding: 18px 26px; border: 1px solid #96ac9d; border-radius: 6px; color: #fff; background: transparent; font: inherit; font-size: 18px; }
+    button:last-child { background: #e6edb9; color: #243e33; border-color: #e6edb9; }
+  </style>
+</head>
+<body>
+  <header><div class="brand">Fieldnotes.</div><nav class="nav"><span>Journal</span><span>Collections</span><span>About</span></nav></header>
+  <main>
+    <div class="eyebrow">A journal for curious minds</div>
+    <h1>A little less noise.<br>A little more perspective.</h1>
+    <p class="intro">Fresh ideas on design, everyday spaces, and the things worth paying attention to.</p>
+    <div class="cards">
+      <section class="card"><div class="art"></div><div class="card-copy"><span>Design · 6 min read</span><h2>Room to think</h2></div></section>
+      <section class="card"><div class="art"></div><div class="card-copy"><span>Culture · 4 min read</span><h2>The shape of a good idea</h2></div></section>
+      <section class="card"><div class="art"></div><div class="card-copy"><span>Spaces · 8 min read</span><h2>Finding a different rhythm</h2></div></section>
+    </div>
+  </main>
+  <!-- A documentation fixture using a generic upstream cookie-banner selector. -->
+  <aside id="cookie-banner" role="dialog" aria-label="Cookie preferences">
+    <div><h2>Your cookie preferences</h2><p>We use cookies to remember your preferences and understand how this journal is used. Choose the settings that work for you.</p></div>
+    <div class="actions"><button type="button">Manage preferences</button><button type="button">Accept cookies</button></div>
+  </aside>
+</body>
+</html>

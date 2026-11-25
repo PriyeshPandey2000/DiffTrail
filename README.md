@@ -1,6 +1,27 @@
-# DiffTrail
+# DiffTrail — Website Screenshot API
 
-DiffTrail is a local screenshot API built with TypeScript, Playwright, and AdGuard. Capture a webpage as a PNG, with optional filtering for cookie banners, popups, ads, and other recurring UI.
+A screenshot API for capturing web pages with configurable cookie-banner, popup, and ad blocking. Built with TypeScript, Playwright, and AdGuard.
+
+## See cleanup in action
+
+| Raw capture · `cleanup:"none"` | Cookie and popup filtering · `cleanup:"standard"` |
+| :---: | :---: |
+| <img src="docs/images/cleanup-raw.png" width="400" alt="Raw screenshot of the Fieldnotes demo page with a cookie banner covering the bottom of the page"> | <img src="docs/images/cleanup-standard.png" width="400" alt="Screenshot of the same Fieldnotes demo page with the cookie banner removed and the article cards visible"> |
+
+Actual PNG output from the same [local demo page](docs/demo/cleanup.html), captured through DiffTrail. Filtering behavior varies by website.
+
+## Take a screenshot
+
+With the [API running](#getting-started), send a URL and choose a cleanup preset:
+
+```sh
+curl --fail-with-body http://127.0.0.1:3000/api/screenshot \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com","cleanup":"standard"}' \
+  --output screenshot.png
+```
+
+Open `screenshot.png` in your image viewer (`open screenshot.png` on macOS). Errors return JSON, so check that curl succeeded before opening the file.
 
 ## Features
 
@@ -11,6 +32,13 @@ DiffTrail is a local screenshot API built with TypeScript, Playwright, and AdGua
 - Isolate cookies and storage between captures.
 
 Cleanup uses bundled, maintained AdGuard filters. No API key is required.
+
+## Use cases
+
+- **Website previews:** generate page thumbnails for bookmarks, directories, and link cards.
+- **Documentation:** capture web pages for guides and automated documentation workflows.
+- **Visual archives:** save PNG snapshots of a page at a point in time.
+- **AI workflows:** supply webpage screenshots as image inputs to vision models and agents.
 
 ## Getting started
 
@@ -33,18 +61,7 @@ npm exec --workspace=server -- playwright install --with-deps chromium
 
 Windows contributors can use WSL2.
 
-## Take a screenshot
-
-```sh
-curl --fail-with-body http://127.0.0.1:3000/api/screenshot \
-  -H 'Content-Type: application/json' \
-  -d '{"url":"https://example.com","cleanup":"standard"}' \
-  --output screenshot.png
-```
-
-Open `screenshot.png` in your image viewer (`open screenshot.png` on macOS). Errors return JSON, so check that curl succeeded before opening the file.
-
-### Cleanup options
+## Cleanup options
 
 | `cleanup` | Behavior |
 | --- | --- |
