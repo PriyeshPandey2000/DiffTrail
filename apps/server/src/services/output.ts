@@ -21,7 +21,7 @@ type RenderOptions = Pick<CaptureOptions, 'format' | 'quality' | 'fullPage' | 'v
 
 // Full-page output is always clipped to the viewport width and to MAX_FULL_PAGE_HEIGHT,
 // so image dimensions are predictable. Pages taller than the limit are truncated and
-// the result says so; the page is never scrolled to trigger lazy-loaded content.
+// the result says so. Optional scrolling is handled by the loading stage.
 export async function renderImage(page: CapturePage, { format, quality, fullPage, viewport }: RenderOptions, timeout: number): Promise<{ image: Buffer; output: ImageOutput }> {
   const base = { type: format, timeout, ...(quality === undefined ? {} : { quality }) } as const;
   const output: ImageOutput = { format, ...(quality === undefined ? {} : { quality }), fullPage, viewport, truncated: false };

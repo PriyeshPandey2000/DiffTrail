@@ -5,7 +5,22 @@ export type CleanupCategory = 'cookies' | 'popups' | 'ads' | 'tracking' | 'socia
   | 'widgets' | 'appBanners' | 'otherAnnoyances';
 export type CleanupCategories = Record<CleanupCategory, boolean>;
 export interface Viewport { width: number; height: number }
+export type WaitUntil = 'load' | 'domcontentloaded' | 'networkidle';
+export interface ScrollOptions { step?: number; delay?: number; maxSteps?: number }
+export interface ResolvedScroll { step: number; delay: number; maxSteps: number }
+export interface LoadingMetadata {
+  waitUntil: WaitUntil;
+  delay: number;
+  timeout: number;
+  selector: 'not-requested' | 'matched';
+  scroll: { status: 'not-requested' | 'completed' | 'limited' | 'blocked'; steps: number };
+}
 export interface CaptureRequest {
+  waitUntil?: WaitUntil;
+  delay?: number;
+  waitForSelector?: string;
+  timeout?: number;
+  scroll?: boolean | ScrollOptions;
   url: string;
   cleanup?: 'none' | 'standard' | 'all' | (Partial<CleanupCategories> & { chat?: false });
   consent?: 'none';
@@ -17,6 +32,11 @@ export interface CaptureRequest {
 }
 // Fully resolved request. It is also a valid CaptureRequest, so normalizing it again is a no-op.
 export interface CaptureOptions {
+  waitUntil: WaitUntil;
+  delay: number;
+  waitForSelector?: string;
+  timeout?: number;
+  scroll: false | ResolvedScroll;
   url: string;
   cleanup: CleanupCategories;
   consent: 'none';
@@ -42,7 +62,9 @@ export interface Residual {
 
 // Only the browser operations used by captures are required of injected workers.
 export type CapturePage = Pick<Page, 'frames' | 'goto' | 'screenshot' | 'evaluate' | 'waitForTimeout'
-  | 'setDefaultTimeout' | 'setDefaultNavigationTimeout'>;
+  | 'setDefaultTimeout' | 'setDefaultNavigationTimeout'> & {
+  waitForSelector(selector: string, options: { state: 'visible'; timeout: number }): Promise<unknown>;
+};
 export interface CaptureContext {
   newPage(): Promise<CapturePage>;
   close(): Promise<void>;
@@ -90,6 +112,7 @@ export interface CaptureMetadata {
   filtering?: AdguardMetadata;
   cookieRulesMayInteract?: boolean;
   output: ImageOutput;
+  loading: LoadingMetadata;
   elapsedMs: number;
 }
 export interface CaptureResult {

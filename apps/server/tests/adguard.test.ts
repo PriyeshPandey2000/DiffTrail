@@ -42,7 +42,7 @@ test('category mapping selects upstream filters, never custom rules', () => {
 test('default capture uses the official runtime and reports unverifiable counts as null', async () => {
   let calls=0, closes=0;
   const fakeContext={close:async()=>{},newPage:async()=>({setDefaultTimeout(){},setDefaultNavigationTimeout(){},goto:async()=>null,
-    waitForTimeout:async()=>{},frames:()=>[],evaluate:async()=>0,screenshot:async()=>Buffer.from('fake')})};
+    waitForSelector:async()=>null,waitForTimeout:async()=>{},frames:()=>[],evaluate:async()=>0,screenshot:async()=>Buffer.from('fake')})};
   const capture=createCaptureService({settleMs:0,adguardFactory:async categories=>{
     calls++;assert.equal(categories.cookies,true);
     return {context:fakeContext,close:async()=>{closes++},metadata:{engine:'adguard-api-mv3',package:'test',referenceVersion:'test',rulesVersion:'test',filters:[18,19],rulesCount:0,setupMs:0}};
@@ -59,7 +59,7 @@ test('default capture uses the official runtime and reports unverifiable counts 
 test('the requested viewport reaches the official runtime', async () => {
   let received: { width: number; height: number } | undefined;
   const fakeContext = { close: async () => {}, newPage: async () => ({ setDefaultTimeout() {}, setDefaultNavigationTimeout() {}, goto: async () => null,
-    waitForTimeout: async () => {}, frames: () => [], evaluate: async () => 0, screenshot: async () => Buffer.from('fake') }) };
+    waitForSelector: async () => null, waitForTimeout: async () => {}, frames: () => [], evaluate: async () => 0, screenshot: async () => Buffer.from('fake') }) };
   const capture = createCaptureService({ settleMs: 0, adguardFactory: async (categories, options) => {
     received = options.viewport;
     return { context: fakeContext, close: async () => {}, metadata: { engine: 'adguard-api-mv3', package: 'test', referenceVersion: 'test', rulesVersion: 'test', filters: [18, 19], rulesCount: 0, setupMs: 0 } };
@@ -86,7 +86,7 @@ test('headless official runtime loads selected filters and hides an upstream ban
 test('headless official capture observes delayed banners and returns a PNG', {skip:!enabled},async()=>{
   const capture=createCaptureService();
   try{
-    const result=await capture({url:`${origin}/delayed`,cleanup:'standard'});
+    const result=await capture({url:`${origin}/delayed`,cleanup:'standard',waitForSelector:'main',scroll:{maxSteps:2,delay:0},delay:50});
     assert.equal(result.image.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
     assert.equal(result.metadata.engine,'adguard-api-mv3');
     assert.equal(result.metadata.residual.state,'none-detected');
