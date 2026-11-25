@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { loadBlocker, applyCosmetics, inspectPage, attachNetworkBlocking } from './blocker.ts';
 import { createAdguardContext } from './adguard-context.ts';
 import { CaptureError, normalizeOptions } from './options.ts';
+import { preparePage } from './loading.ts';
 import { OUTPUT_FORMATS, SCALE, renderImage } from './output.ts';
 export { CaptureError } from './options.ts';
 
@@ -55,6 +56,7 @@ export function createCaptureService({
   };
   async function capture(input: unknown): Promise<CaptureResult> {
     const options = normalizeOptions(input);
+    const requestTimeout = options.timeout ?? captureTimeout;
     if (closed) throw new CaptureError('SERVICE_CLOSED', 'Capture service is closed.', 503);
     if (active >= maxConcurrent) throw new CaptureError('CAPACITY_EXCEEDED', 'Capture capacity reached. Try again shortly.', 503);
     active++;
@@ -76,13 +78,13 @@ export function createCaptureService({
     };
     const ensureActive = () => {
       if (closed) throw new CaptureError('SERVICE_CLOSED', 'Capture service is closed.', 503);
-      if (expired || Date.now() - start >= captureTimeout) throw new CaptureError('CAPTURE_TIMEOUT', 'Capture exceeded its time limit.', 504);
+      if (expired || Date.now() - start >= requestTimeout) throw new CaptureError('CAPTURE_TIMEOUT', 'Capture exceeded its time limit.', 504);
     };
     const deadline = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         expired = true;
         reject(new CaptureError('CAPTURE_TIMEOUT', 'Capture exceeded its time limit.', 504));
-      }, captureTimeout);
+      }, requestTimeout);
     });
     const work = async (): Promise<CaptureResult> => {
       const requested = Object.values(options.cleanup).some(Boolean);
@@ -93,7 +95,7 @@ export function createCaptureService({
       }
       ensureActive();
       if (requested && cleanupEngine === 'adguard') {
-        nativeWorker = await adguardFactory(options.cleanup, { headless, timeoutMs: Math.max(1, captureTimeout - (Date.now() - start)), viewport: options.viewport });
+        nativeWorker = await adguardFactory(options.cleanup, { headless, timeoutMs: Math.max(1, requestTimeout - (Date.now() - start)), viewport: options.viewport });
         context = nativeWorker.context;
       } else {
         const instance = await getBrowser();
@@ -111,14 +113,16 @@ export function createCaptureService({
         if (blocker?.network) await attachNetworkBlocking(context, blocker.network, counters);
         const page = await context.newPage();
         page.setDefaultTimeout(5000);
-        page.setDefaultNavigationTimeout(Math.min(15_000, captureTimeout));
-        const response = await page.goto(options.url, { waitUntil: 'load' });
+        page.setDefaultNavigationTimeout(Math.min(15_000, requestTimeout));
+        const response = await page.goto(options.url, { waitUntil: options.waitUntil });
         if (response && response.status() >= 400) {
           const upstreamStatus = response.status();
           const challenge = response.headers?.()['cf-mitigated'] === 'challenge';
           throw new CaptureError('UPSTREAM_HTTP_ERROR', `The target page returned HTTP ${upstreamStatus}${challenge ? ' (browser verification challenge)' : ''}.`, 502,
             { upstreamStatus, ...(challenge ? { reason: 'browser-verification' } : {}) });
         }
+        const loading = await preparePage(page, options, requestTimeout);
+        ensureActive();
         const summary = { hidden: 0, guarded: 0, invalid: 0, framesSkipped: 0 };
         let residual: Residual = { state: 'not-checked', signals: [] };
         let failed = false, transientFrameErrors = 0;
@@ -131,7 +135,7 @@ export function createCaptureService({
         }
         if (blocker) {
           const end = Date.now() + settleMs;
-          // Observe delayed DOM in a bounded window. Never scroll or click the page.
+          // Observe delayed DOM after optional loading preparation; cleanup never clicks.
           do {
             ensureActive();
             try {
@@ -154,7 +158,7 @@ export function createCaptureService({
         }
         ensureActive();
         // Full pages can take several seconds to encode; they may use the rest of the deadline.
-        const { image, output } = await renderImage(page, options, options.fullPage ? Math.max(1000, captureTimeout - (Date.now() - start)) : 5000);
+        const { image, output } = await renderImage(page, options, options.fullPage ? Math.max(1000, requestTimeout - (Date.now() - start)) : 5000);
         ensureActive();
         const applied = summary.hidden > 0 || counters.blockedRequests > 0;
         const incomplete = failed || summary.framesSkipped > 0 || summary.invalid > 0 || counters.networkErrors > 0;
@@ -169,7 +173,7 @@ export function createCaptureService({
             filtering: nativeWorker.metadata,
             cookieRulesMayInteract: Boolean(options.cleanup.cookies),
           } : {}),
-          output, elapsedMs: Date.now() - start,
+          output, loading, elapsedMs: Date.now() - start,
         };
         return { image, contentType: OUTPUT_FORMATS[output.format].contentType, cleanup: status, metadata };
       } finally { await closeContext(); }

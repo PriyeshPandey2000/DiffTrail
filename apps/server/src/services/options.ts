@@ -1,4 +1,4 @@
-import type { CaptureOptions, CleanupCategories, CleanupCategory, Viewport } from './types.ts';
+import type { CaptureOptions, CleanupCategories, CleanupCategory, Viewport, WaitUntil, ResolvedScroll } from './types.ts';
 
 import { DEFAULT_FORMAT, DEFAULT_QUALITY, DEFAULT_VIEWPORT, OUTPUT_FORMATS, VIEWPORT_LIMITS } from './output.ts';
 
@@ -19,8 +19,8 @@ export function normalizeOptions(input: unknown): CaptureOptions {
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid('Provide a JSON object.');
   const options = input as Record<string, unknown>;
   if (Object.hasOwn(options, 'clean')) invalid('clean was replaced. Use cleanup:"standard" or cleanup:"none". No AI is called.');
-  if (Object.keys(options).some(key => !['url', 'cleanup', 'consent', 'ai', 'format', 'quality', 'fullPage', 'viewport'].includes(key))) {
-    invalid('Unknown option. Supported options: url, cleanup, consent, ai, format, quality, fullPage, viewport.');
+  if (Object.keys(options).some(key => !['url', 'cleanup', 'consent', 'ai', 'format', 'quality', 'fullPage', 'viewport', 'waitUntil', 'delay', 'waitForSelector', 'timeout', 'scroll'].includes(key))) {
+    invalid('Unknown option. Supported options: url, cleanup, consent, ai, format, quality, fullPage, viewport, waitUntil, delay, waitForSelector, timeout, scroll.');
   }
   let target;
   try { target = new URL(typeof options.url === 'string' ? options.url : ''); } catch { /* handled below */ }
@@ -42,7 +42,8 @@ export function normalizeOptions(input: unknown): CaptureOptions {
   }
   if (options.consent !== undefined && options.consent !== 'none') invalid('Only consent:"none" is available: no additional consent-rejection automation. Upstream cookie rules can interact with banners.');
   if (options.ai !== undefined && options.ai !== false) invalid('Only ai:false is available in this iteration. Cleanup uses maintained rules without AI.');
-  return { url: target.href, cleanup: categories, consent: 'none', ai: false, ...normalizeOutput(options, invalid) };
+  const output = normalizeOutput(options, invalid);
+  return { url: target.href, cleanup: categories, consent: 'none', ai: false, ...output, ...normalizeLoading(options, invalid, output.viewport) };
 }
 
 function normalizeOutput(options: Record<string, unknown>, invalid: (message: string) => never) {
@@ -69,4 +70,26 @@ function normalizeOutput(options: Record<string, unknown>, invalid: (message: st
     viewport[key] = value as number;
   }
   return { format, ...(quality === undefined ? {} : { quality }), fullPage: options.fullPage === true, viewport };
+}
+
+function normalizeLoading(options: Record<string, unknown>, invalid: (message: string) => never, viewport: Viewport): Pick<CaptureOptions, 'waitUntil' | 'delay' | 'timeout' | 'waitForSelector' | 'scroll'> {
+  const integer = (value: unknown, fallback: number, min: number, max: number, name: string): number => {
+    if (value === undefined) return fallback;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) invalid(`${name} must be an integer from ${min} to ${max}.`);
+    return value as number;
+  };
+  const waitUntil = options.waitUntil === undefined ? 'load' : options.waitUntil;
+  if (!['load', 'domcontentloaded', 'networkidle'].includes(waitUntil as string)) invalid('waitUntil must be "load", "domcontentloaded", or "networkidle".');
+  const delay = integer(options.delay, 0, 0, 10_000, 'delay');
+  const timeout = options.timeout === undefined ? undefined : integer(options.timeout, 30_000, 1000, 90_000, 'timeout');
+  const selector = options.waitForSelector;
+  if (selector !== undefined && (typeof selector !== 'string' || !selector.trim() || selector.length > 1000)) invalid('waitForSelector must be a non-empty CSS selector of at most 1000 characters.');
+  let scroll: false | ResolvedScroll = false;
+  if (options.scroll !== undefined && options.scroll !== false) {
+    const value = options.scroll === true ? {} : options.scroll;
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !['step', 'delay', 'maxSteps'].includes(key))) invalid('scroll must be a boolean or an object with step, delay, and maxSteps.');
+    const config = value as Record<string, unknown>;
+    scroll = { step: integer(config.step, Math.min(800, Math.floor(viewport.height * 0.8)), 100, 2000, 'scroll.step'), delay: integer(config.delay, 200, 0, 1000, 'scroll.delay'), maxSteps: integer(config.maxSteps, 30, 1, 100, 'scroll.maxSteps') };
+  }
+  return { waitUntil: waitUntil as WaitUntil, delay, ...(timeout === undefined ? {} : { timeout }), ...(selector === undefined ? {} : { waitForSelector: selector as string }), scroll };
 }

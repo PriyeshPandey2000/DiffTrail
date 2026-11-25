@@ -26,6 +26,16 @@ curl --fail-with-body http://127.0.0.1:3000/api/screenshot \
 
 Open `screenshot.png` in your image viewer (`open screenshot.png` on macOS). Errors return JSON, so check that curl succeeded before opening the file.
 
+### Wait for page content
+
+Use loading controls for pages with delayed content or lazy-loaded images:
+
+```json
+{"url":"https://example.com","fullPage":true,"waitUntil":"domcontentloaded","scroll":true,"delay":1000,"timeout":60000}
+```
+
+You can also wait for a visible CSS selector with `waitForSelector`. See [loading controls](docs/api.md#loading-controls) for options, bounds, and timeout behavior.
+
 ## Features
 
 - Capture URLs as PNG, JPEG, or WebP, at a chosen viewport size or as a full page.
