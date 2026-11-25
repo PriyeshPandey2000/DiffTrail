@@ -52,7 +52,7 @@ Upstream failures include `upstreamStatus` and, when explicitly identified by th
 
 ## Validation and remaining limits
 
-The normal suite covers the retained cosmetic candidate, validation, PNG delivery, isolation, deadlines and raw browser lifecycle. `npm run test:adguard` also exercises the real official headless runtime, category readiness, delayed banners and cross-request cookie/storage isolation. See README for the current commands and test output.
+The normal suite covers the retained cosmetic candidate, validation, PNG delivery, isolation, deadlines and raw browser lifecycle. `npm run test:adguard` also exercises the real official headless runtime, category readiness, delayed banners and cross-request cookie/storage isolation. See README for the current commands.
 
 The initial SDK dependency audit produced nine high-severity entries. JS-YAML is now overridden to patched 3.15.2 and the runtime rebuilt. Zod remains unresolved because the SDK pins major version 3 and the advisory fix requires major version 4. The full CI audit records that exact advisory with an expiring exception and rejects new findings. See [dependency review](dependency-audit.md). The generated browser bundle includes SDK dependencies; development-only installation is not a security fix. Resolve the remaining advisory before public deployment. This remains a trusted loopback development service without authentication or outbound network isolation.
 
