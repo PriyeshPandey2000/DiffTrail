@@ -4,11 +4,14 @@ A screenshot API for capturing web pages with configurable cookie-banner, popup,
 
 ## See cleanup in action
 
+Real captures of live sites through DiffTrail, with the same request except `cleanup`.
+
 | Raw capture · `cleanup:"none"` | Cookie and popup filtering · `cleanup:"standard"` |
 | :---: | :---: |
-| <img src="docs/images/cleanup-raw.png" width="400" alt="Raw screenshot of the Fieldnotes demo page with a cookie banner covering the bottom of the page"> | <img src="docs/images/cleanup-standard.png" width="400" alt="Screenshot of the same Fieldnotes demo page with the cookie banner removed and the article cards visible"> |
+| <img src="docs/images/trustarc-raw.png" width="400" alt="Raw screenshot of trustarc.com with a cookie consent bar across the bottom"> | <img src="docs/images/trustarc-standard.png" width="400" alt="Screenshot of trustarc.com with the cookie consent bar removed"> |
+| <img src="docs/images/ikea-raw.png" width="400" alt="Raw screenshot of ikea.com/gb with a cookie dialog over the hero banner"> | <img src="docs/images/ikea-standard.png" width="400" alt="Screenshot of ikea.com/gb with the cookie dialog removed"> |
 
-Actual PNG output from the same [local demo page](docs/demo/cleanup.html), captured through DiffTrail. Filtering behavior varies by website.
+Captured 25 November 2026 from one network at 1920×1080. Filtering varies by site and visit; page content such as carousels and lazy-loaded images can also differ between captures.
 
 ## Take a screenshot
 
