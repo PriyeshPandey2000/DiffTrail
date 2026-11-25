@@ -36,9 +36,22 @@ Use loading controls for pages with delayed content or lazy-loaded images:
 
 Pixel density stays at 2× by default; use `scale:1` for smaller images. Full-page requests scroll automatically unless `scroll:false` is passed, and captures briefly wait for relevant images within a bounded budget. You can also wait for a visible CSS selector with `waitForSelector`. See [loading controls](docs/api.md#loading-controls) for options, bounds, and timeout behavior.
 
+### Capture an element or rectangle
+
+```json
+{"url":"https://example.com","selector":"h1","cleanup":"standard"}
+```
+
+```json
+{"url":"https://example.com","clip":{"x":100,"y":200,"width":600,"height":400}}
+```
+
+Selectors capture the first match. Rectangles use document CSS pixels; the default 2× density doubles output dimensions. Missing targets and invalid bounds return errors. See [element and rectangle capture](docs/api.md#element-and-rectangle-capture) for loading behavior and limits.
+
 ## Features
 
 - Capture URLs as PNG, JPEG, or WebP, at a chosen viewport size or as a full page.
+- Capture a specific element or a rectangle using document coordinates.
 - Choose raw screenshots, cleanup presets, or individual filter categories.
 - Run headless or open a visible browser for debugging.
 - Inspect cleanup status, residual UI signals, and timings in response headers.

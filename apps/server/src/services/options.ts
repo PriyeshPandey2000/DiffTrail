@@ -1,4 +1,4 @@
-import type { CaptureOptions, CleanupCategories, CleanupCategory, Viewport, WaitUntil, ResolvedScroll } from './types.ts';
+import type { CaptureOptions, CleanupCategories, CleanupCategory, Viewport, WaitUntil, ResolvedScroll, Clip } from './types.ts';
 
 import { DEFAULT_FORMAT, DEFAULT_QUALITY, DEFAULT_VIEWPORT, OUTPUT_FORMATS, VIEWPORT_LIMITS, SCALE } from './output.ts';
 
@@ -19,8 +19,8 @@ export function normalizeOptions(input: unknown): CaptureOptions {
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid('Provide a JSON object.');
   const options = input as Record<string, unknown>;
   if (Object.hasOwn(options, 'clean')) invalid('clean was replaced. Use cleanup:"standard" or cleanup:"none". No AI is called.');
-  if (Object.keys(options).some(key => !['url', 'cleanup', 'consent', 'ai', 'format', 'quality', 'fullPage', 'viewport', 'waitUntil', 'delay', 'waitForSelector', 'timeout', 'scroll', 'scale', 'maxHeight'].includes(key))) {
-    invalid('Unknown option. Supported options: url, cleanup, consent, ai, format, quality, fullPage, viewport, waitUntil, delay, waitForSelector, timeout, scroll, scale, maxHeight.');
+  if (Object.keys(options).some(key => !['url', 'cleanup', 'consent', 'ai', 'format', 'quality', 'fullPage', 'viewport', 'waitUntil', 'delay', 'waitForSelector', 'timeout', 'scroll', 'scale', 'maxHeight', 'selector', 'clip'].includes(key))) {
+    invalid('Unknown option. Supported options: url, cleanup, consent, ai, format, quality, fullPage, viewport, waitUntil, delay, waitForSelector, timeout, scroll, scale, maxHeight, selector, clip.');
   }
   let target;
   try { target = new URL(typeof options.url === 'string' ? options.url : ''); } catch { /* handled below */ }
@@ -43,7 +43,22 @@ export function normalizeOptions(input: unknown): CaptureOptions {
   if (options.consent !== undefined && options.consent !== 'none') invalid('Only consent:"none" is available: no additional consent-rejection automation. Upstream cookie rules can interact with banners.');
   if (options.ai !== undefined && options.ai !== false) invalid('Only ai:false is available in this iteration. Cleanup uses maintained rules without AI.');
   const output = normalizeOutput(options, invalid);
-  return { url: target.href, cleanup: categories, consent: 'none', ai: false, ...output, ...normalizeLoading(options, invalid, output.viewport) };
+  return { url: target.href, cleanup: categories, consent: 'none', ai: false, ...output, ...normalizeLoading(options, invalid, output.viewport), ...normalizeTarget(options, invalid) };
+}
+
+function normalizeTarget(options: Record<string, unknown>, invalid: (message: string) => never): Pick<CaptureOptions, 'selector' | 'clip'> {
+  const { selector, clip } = options;
+  if (selector !== undefined && (typeof selector !== 'string' || !selector.trim() || selector.length > 1000)) invalid('selector must be a non-empty CSS selector of at most 1000 characters.');
+  if ((selector !== undefined && clip !== undefined) || ((selector !== undefined || clip !== undefined) && options.fullPage === true)) invalid('selector, clip, and fullPage:true are mutually exclusive.');
+  if (clip !== undefined) {
+    if (!clip || typeof clip !== 'object' || Array.isArray(clip) || Object.keys(clip).some(key => !['x', 'y', 'width', 'height'].includes(key))) invalid('clip requires x, y, width, and height in document CSS pixels.');
+    for (const key of ['x', 'y', 'width', 'height'] as const) {
+      const value = (clip as Record<string, unknown>)[key];
+      const min = key === 'x' || key === 'y' ? 0 : 1;
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > 100_000) invalid(`clip.${key} must be an integer from ${min} to 100000 CSS pixels.`);
+    }
+  }
+  return { ...(selector === undefined ? {} : { selector: selector as string }), ...(clip === undefined ? {} : { clip: { ...clip as Clip } }) };
 }
 
 function normalizeOutput(options: Record<string, unknown>, invalid: (message: string) => never) {

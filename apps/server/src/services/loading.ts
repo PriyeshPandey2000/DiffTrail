@@ -1,4 +1,4 @@
-import type { CaptureOptions, CapturePage, LoadingMetadata, ImageReadiness } from './types.ts';
+import type { CaptureOptions, CapturePage, LoadingMetadata, ImageReadiness, Clip } from './types.ts';
 import { CaptureError } from './options.ts';
 import { captureHeightLimit } from './output.ts';
 
@@ -43,21 +43,24 @@ export async function preparePage(page: CapturePage, options: CaptureOptions, ti
 
 // Best-effort main-document img readiness. Broken images never hold up a capture.
 // This is bounded by both this budget and capture's shared request deadline.
-export async function waitForImages(page: CapturePage, options: CaptureOptions, budgetMs = 1500): Promise<ImageReadiness> {
+export async function waitForImages(page: CapturePage, options: CaptureOptions, budgetMs = 1500, region?: Clip): Promise<ImageReadiness> {
   const start = Date.now();
   const unknown = (): ImageReadiness => ({ state: 'unknown', loaded: 0, failed: 0, pending: 0, untriggered: 0, elapsedMs: Date.now() - start });
   const height = options.fullPage ? captureHeightLimit(options).height : options.viewport.height;
   try {
     while (true) {
-      const counts = await page.evaluate(({ fullPage, height, width }) => {
+      const counts = await page.evaluate(({ fullPage, height, width, region }) => {
         const all = document.querySelectorAll('img');
         const counts = { loaded: 0, failed: 0, pending: 0, untriggered: 0, limited: all.length > 10_000 };
-        const top = fullPage ? 0 : scrollY;
+        const top = region?.y ?? (fullPage ? 0 : scrollY);
+        const left = region?.x ?? 0;
+        const right = left + (region?.width ?? width);
+        const bottom = top + (region?.height ?? height);
         for (let i = 0; i < Math.min(all.length, 10_000); i++) {
           const image = all[i];
           const box = image.getBoundingClientRect();
-          if (box.width <= 0 || box.height <= 0 || box.right <= 0 || box.left >= width
-            || box.bottom + scrollY <= top || box.top + scrollY >= top + height) continue;
+          if (box.width <= 0 || box.height <= 0 || box.right + scrollX <= left || box.left + scrollX >= right
+            || box.bottom + scrollY <= top || box.top + scrollY >= bottom) continue;
           const style = getComputedStyle(image);
           if (style.visibility === 'hidden' || style.opacity === '0') continue;
           if (!(image.currentSrc || image.getAttribute('src') || image.getAttribute('srcset'))) counts.untriggered++;
@@ -66,7 +69,7 @@ export async function waitForImages(page: CapturePage, options: CaptureOptions, 
           else counts.failed++;
         }
         return counts;
-      }, { fullPage: options.fullPage, height, width: options.viewport.width });
+      }, { fullPage: options.fullPage, height, width: options.viewport.width, region });
       if (!counts || typeof counts !== 'object') return unknown();
       const remaining = budgetMs - (Date.now() - start);
       if ((!counts.pending && !counts.untriggered) || remaining <= 0) {
