@@ -1,0 +1,9 @@
+[
+  {
+    "package": "zod",
+    "advisory": "GHSA-mrhx-c7xc-m3w5",
+    "reviewed": "2026-11-25",
+    "expires": "2026-12-25",
+    "reason": "AdGuard SDK pins Zod 3.24.4. The reported fix requires Zod 4.6.6; an unsupported major override has not been applied. This exception only records the local-development limitation and does not approve public deployment."
+  }
+]

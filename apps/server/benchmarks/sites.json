@@ -1,0 +1,102 @@
+[
+  {
+    "id": "cookiebot",
+    "url": "https://www.cookiebot.com/en/",
+    "category": "consent platform"
+  },
+  {
+    "id": "onetrust",
+    "url": "https://www.onetrust.com/",
+    "category": "consent platform"
+  },
+  {
+    "id": "usercentrics",
+    "url": "https://usercentrics.com/",
+    "category": "consent platform"
+  },
+  {
+    "id": "trustarc",
+    "url": "https://trustarc.com/",
+    "category": "consent platform"
+  },
+  {
+    "id": "bbc",
+    "url": "https://www.bbc.com/",
+    "category": "news"
+  },
+  {
+    "id": "guardian",
+    "url": "https://www.theguardian.com/international",
+    "category": "news"
+  },
+  {
+    "id": "reuters",
+    "url": "https://www.reuters.com/",
+    "category": "news"
+  },
+  {
+    "id": "cnn",
+    "url": "https://edition.cnn.com/",
+    "category": "news"
+  },
+  {
+    "id": "ikea",
+    "url": "https://www.ikea.com/gb/en/",
+    "category": "retail"
+  },
+  {
+    "id": "samsung",
+    "url": "https://www.samsung.com/uk/",
+    "category": "retail"
+  },
+  {
+    "id": "adobe",
+    "url": "https://www.adobe.com/uk/",
+    "category": "software"
+  },
+  {
+    "id": "microsoft",
+    "url": "https://www.microsoft.com/en-gb/",
+    "category": "software"
+  },
+  {
+    "id": "stackoverflow",
+    "url": "https://stackoverflow.com/questions",
+    "category": "developer community"
+  },
+  {
+    "id": "booking",
+    "url": "https://www.booking.com/",
+    "category": "travel"
+  },
+  {
+    "id": "wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Main_Page",
+    "category": "control"
+  },
+  {
+    "id": "github",
+    "url": "https://github.com/",
+    "category": "control"
+  },
+  {
+    "id": "theverge",
+    "url": "https://www.theverge.com/",
+    "category": "news"
+  },
+  {
+    "id": "wired",
+    "url": "https://www.wired.com/",
+    "category": "news"
+  },
+  {
+    "id": "independent",
+    "url": "https://www.independent.co.uk/",
+    "category": "news"
+  },
+  {
+    "id": "techradar",
+    "url": "https://www.techradar.com/",
+    "category": "news"
+  }
+]

@@ -1,0 +1,440 @@
+{
+  "schemaVersion": 1,
+  "referenceRun": "2026-11-24T10-40-57.310Z",
+  "scope": "Manually reviewed extension reference. Expectations describe the observed UI, not proven library coverage. Live sites are not CI gates.",
+  "sites": [
+    {
+      "id": "cookiebot",
+      "url": "https://www.cookiebot.com/en/",
+      "category": "consent platform",
+      "status": "reachable-reference",
+      "baseline": "Cookie consent dialog visible",
+      "note": "Only the Ghostery consent-enabled preset cleared this site; the other two retained the dialog after scrolling.",
+      "categories": [
+        "cookies"
+      ],
+      "extensionReference": {
+        "ubol": "cookies: remained",
+        "ghostery": "cookies: removed",
+        "adguard": "cookies: remained"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "cookies": "remained"
+        },
+        "note": "Cookiebot consent dialog remains in both presets."
+      }
+    },
+    {
+      "id": "onetrust",
+      "url": "https://www.onetrust.com/",
+      "category": "consent platform",
+      "status": "reachable-reference",
+      "baseline": "Cookie consent dialog and backdrop visible",
+      "note": "All presets removed the dialog and backdrop; normal content stayed visible.",
+      "categories": [
+        "cookies"
+      ],
+      "extensionReference": {
+        "ubol": "cookies: removed",
+        "ghostery": "cookies: removed",
+        "adguard": "cookies: removed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "cookies": "removed"
+        },
+        "note": "Consent dialog and backdrop hidden in both."
+      }
+    },
+    {
+      "id": "usercentrics",
+      "url": "https://usercentrics.com/",
+      "category": "consent platform",
+      "status": "reachable-reference",
+      "baseline": "Ask AI chat launcher visible; no cookie dialog",
+      "note": "The launcher remained in all three. A navigation text match is not counted as a cookie banner.",
+      "categories": [
+        "chat"
+      ],
+      "extensionReference": {
+        "ubol": "chat: remained",
+        "ghostery": "chat: remained",
+        "adguard": "chat: remained"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "chat": "remained"
+        },
+        "note": "Ask AI launcher remains in both; no cookie case scored."
+      }
+    },
+    {
+      "id": "trustarc",
+      "url": "https://trustarc.com/",
+      "category": "consent platform",
+      "status": "reachable-reference",
+      "baseline": "Bottom cookie notice visible",
+      "note": "All three removed the bottom notice.",
+      "categories": [
+        "cookies"
+      ],
+      "extensionReference": {
+        "ubol": "cookies: removed",
+        "ghostery": "cookies: removed",
+        "adguard": "cookies: removed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "cookies": "removed"
+        },
+        "note": "Bottom notice removed in both."
+      }
+    },
+    {
+      "id": "bbc",
+      "url": "https://www.bbc.com/",
+      "category": "news",
+      "status": "reachable-reference",
+      "baseline": "No cookie dialog; large ad area visible",
+      "note": "All presets changed the ad area; no cookie-removal success is inferred from this control.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "No scored obstruction observed",
+        "ghostery": "No scored obstruction observed",
+        "adguard": "No scored obstruction observed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {},
+        "note": "Ads removed; layout changes in both. Not a cookie success."
+      }
+    },
+    {
+      "id": "guardian",
+      "url": "https://www.theguardian.com/international",
+      "category": "news",
+      "status": "reachable-reference",
+      "baseline": "Iframe consent dialog visible; scroll locked",
+      "note": "Only AdGuard removed the dialog and restored scrolling (scrollY 650 vs 0 for the other two).",
+      "categories": [
+        "cookies"
+      ],
+      "extensionReference": {
+        "ubol": "cookies: remained",
+        "ghostery": "cookies: remained",
+        "adguard": "cookies: removed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "cookies": "removed"
+        },
+        "note": "Iframe dialog removed; both reach scrollY 650 versus baseline 0."
+      }
+    },
+    {
+      "id": "reuters",
+      "url": "https://www.reuters.com/",
+      "category": "news",
+      "status": "excluded-access-restriction",
+      "baseline": "HTTP 401 access-restricted page",
+      "note": "Untestable in all modes; excluded from cleanup scoring.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "Untestable",
+        "ghostery": "Untestable",
+        "adguard": "Untestable"
+      },
+      "libraryExpectation": "unmeasured"
+    },
+    {
+      "id": "cnn",
+      "url": "https://edition.cnn.com/",
+      "category": "news",
+      "status": "reachable-reference",
+      "baseline": "No cookie dialog; large top ad visible",
+      "note": "Ad area removed under all three; the DRM video warning was present in the baseline too.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "No scored obstruction observed",
+        "ghostery": "No scored obstruction observed",
+        "adguard": "No scored obstruction observed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {},
+        "note": "Ads/layout change in both; DRM warning also occurs in baseline."
+      }
+    },
+    {
+      "id": "ikea",
+      "url": "https://www.ikea.com/gb/en/",
+      "category": "retail",
+      "status": "reachable-reference",
+      "baseline": "Cookie panel visible",
+      "note": "All three removed the panel.",
+      "categories": [
+        "cookies"
+      ],
+      "extensionReference": {
+        "ubol": "cookies: removed",
+        "ghostery": "cookies: removed",
+        "adguard": "cookies: removed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "cookies": "removed"
+        },
+        "note": "Cookie panel removed in both."
+      }
+    },
+    {
+      "id": "samsung",
+      "url": "https://www.samsung.com/uk/",
+      "category": "retail",
+      "status": "reachable-reference",
+      "baseline": "Cookie modal and WhatsApp launcher visible",
+      "note": "All removed the cookie modal; all retained the WhatsApp chat launcher and location selector.",
+      "categories": [
+        "cookies",
+        "chat"
+      ],
+      "extensionReference": {
+        "ubol": "cookies: removed; chat: remained",
+        "ghostery": "cookies: removed; chat: remained",
+        "adguard": "cookies: removed; chat: remained"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "cookies": "removed",
+          "chat": "remained"
+        },
+        "note": "Cookie modal removed; WhatsApp launcher and location selector remain in both."
+      }
+    },
+    {
+      "id": "adobe",
+      "url": "https://www.adobe.com/uk/",
+      "category": "software",
+      "status": "excluded-access-restriction",
+      "baseline": "HTTP 403 access-denied page",
+      "note": "Untestable in all modes; excluded from cleanup scoring.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "Untestable",
+        "ghostery": "Untestable",
+        "adguard": "Untestable"
+      },
+      "libraryExpectation": "unmeasured"
+    },
+    {
+      "id": "microsoft",
+      "url": "https://www.microsoft.com/en-gb/",
+      "category": "software",
+      "status": "reachable-reference",
+      "baseline": "Chat solicitation visible; no cookie dialog",
+      "note": "AdGuard removed the open chat prompt. The other presets retained it.",
+      "categories": [
+        "chat"
+      ],
+      "extensionReference": {
+        "ubol": "chat: remained",
+        "ghostery": "chat: remained",
+        "adguard": "chat: removed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "chat": "removed"
+        },
+        "note": "Open chat solicitation removed in both."
+      }
+    },
+    {
+      "id": "stackoverflow",
+      "url": "https://stackoverflow.com/questions",
+      "category": "developer community",
+      "status": "excluded-access-restriction",
+      "baseline": "HTTP 403 security-verification challenge",
+      "note": "Untestable in all modes; excluded from cleanup scoring.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "Untestable",
+        "ghostery": "Untestable",
+        "adguard": "Untestable"
+      },
+      "libraryExpectation": "unmeasured"
+    },
+    {
+      "id": "booking",
+      "url": "https://www.booking.com/",
+      "category": "travel",
+      "status": "reachable-reference",
+      "baseline": "Genius sign-in promotion and backdrop visible",
+      "note": "HTTP 202 still rendered the real page. Only AdGuard removed the promotion and restored scrolling.",
+      "categories": [
+        "popups"
+      ],
+      "extensionReference": {
+        "ubol": "popups: remained",
+        "ghostery": "popups: remained",
+        "adguard": "popups: removed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "popups": "removed"
+        },
+        "note": "Genius promotion/backdrop removed; both reach scrollY 650 versus baseline 0. Hero A/B content differs between visits."
+      }
+    },
+    {
+      "id": "wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Main_Page",
+      "category": "control",
+      "status": "reachable-reference",
+      "baseline": "No scored dialog or chat control",
+      "note": "The Wiki Loves Food notice was removed by uBOL and AdGuard and retained by Ghostery; recorded as an additional difference, not a scored obstructing dialog.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "No scored obstruction observed",
+        "ghostery": "No scored obstruction observed",
+        "adguard": "No scored obstruction observed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {},
+        "note": "Wiki Loves Food notice removed in both; not scored as an obstructing cookie/popup case."
+      }
+    },
+    {
+      "id": "github",
+      "url": "https://github.com/",
+      "category": "control",
+      "status": "reachable-reference",
+      "baseline": "No scored obstruction observed",
+      "note": "Control case. Dynamic hero rendering is not used to claim content fidelity.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "No scored obstruction observed",
+        "ghostery": "No scored obstruction observed",
+        "adguard": "No scored obstruction observed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {},
+        "note": "No scored obstruction; animated hero timing differs."
+      }
+    },
+    {
+      "id": "theverge",
+      "url": "https://www.theverge.com/",
+      "category": "news",
+      "status": "reachable-reference",
+      "baseline": "Cookie/privacy notice visible",
+      "note": "All three removed the bottom privacy notice.",
+      "categories": [
+        "cookies"
+      ],
+      "extensionReference": {
+        "ubol": "cookies: removed",
+        "ghostery": "cookies: removed",
+        "adguard": "cookies: removed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "cookies": "removed"
+        },
+        "note": "Privacy notice removed in both; ad region also changes."
+      }
+    },
+    {
+      "id": "wired",
+      "url": "https://www.wired.com/",
+      "category": "news",
+      "status": "reachable-reference",
+      "baseline": "No scored obstruction observed",
+      "note": "Ad regions and article positions changed under filtering; no cookie-removal success is counted.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "No scored obstruction observed",
+        "ghostery": "No scored obstruction observed",
+        "adguard": "No scored obstruction observed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {},
+        "note": "Ad regions removed and layout changed in both."
+      }
+    },
+    {
+      "id": "independent",
+      "url": "https://www.independent.co.uk/",
+      "category": "news",
+      "status": "reachable-reference",
+      "baseline": "Membership subscription modal and backdrop visible",
+      "note": "All three retained the modal through the observation window and after scrolling.",
+      "categories": [
+        "popups"
+      ],
+      "extensionReference": {
+        "ubol": "popups: remained",
+        "ghostery": "popups: remained",
+        "adguard": "popups: remained"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {
+          "popups": "remained"
+        },
+        "note": "Membership modal and backdrop remain in both after scrolling."
+      }
+    },
+    {
+      "id": "techradar",
+      "url": "https://www.techradar.com/",
+      "category": "news",
+      "status": "reachable-reference",
+      "baseline": "No scored obstruction observed",
+      "note": "Top ad space changed under filtering; no cookie-removal success is counted.",
+      "categories": [],
+      "extensionReference": {
+        "ubol": "No scored obstruction observed",
+        "ghostery": "No scored obstruction observed",
+        "adguard": "No scored obstruction observed"
+      },
+      "libraryExpectation": "unmeasured",
+      "officialAdguardApiOutcome": {
+        "categories": {},
+        "note": "Ads removed and layout changed in both; no cookie case scored."
+      }
+    }
+  ],
+  "libraryCandidate": "Restricted Ghostery cosmetic candidate (libraryExpectation remains unmeasured for that candidate)",
+  "officialAdguardReference": {
+    "run": "2026-11-25T04-34-33.346Z",
+    "date": "2026-11-25",
+    "filters": [
+      2,
+      3,
+      4,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      25
+    ],
+    "headless": true,
+    "scope": "One desktop host/IP, one visit per mode/site, full preset; not the standard API preset"
+  }
+}
