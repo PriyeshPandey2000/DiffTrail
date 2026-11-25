@@ -7,7 +7,7 @@ import { after, before, test } from 'node:test';
 import { createApp } from '../src/app.ts';
 import { createCaptureService } from '../src/services/capture.ts';
 import { normalizeOptions } from '../src/services/options.ts';
-import { MAX_FULL_PAGE_HEIGHT, SCALE } from '../src/services/output.ts';
+import { MAX_FULL_PAGE_HEIGHT, SCALE, MAX_OUTPUT_PIXELS, captureHeightLimit } from '../src/services/output.ts';
 
 const pageOf = (height: number) => `<body style="margin:0"><div style="height:${height}px;background:linear-gradient(red,blue)"></div></body>`;
 let target: http.Server;
@@ -38,6 +38,7 @@ test('output options default to the existing 1920x1080 PNG viewport capture', ()
   const options = normalizeOptions({ url: origin });
   assert.equal(options.format, 'png');
   assert.equal(options.fullPage, false);
+  assert.equal(options.scale, 2);
   assert.deepEqual(options.viewport, { width: 1920, height: 1080 });
   assert.equal('quality' in options, false);
 });
@@ -64,7 +65,8 @@ test('invalid output options are rejected', () => {
     { fullPage: 'true' }, { fullPage: 1 }, { fullPage: null },
     { viewport: 1280 }, { viewport: null }, { viewport: [] }, { viewport: { width: 199 } }, { viewport: { width: 3841 } },
     { viewport: { height: 199 } }, { viewport: { height: 4321 } }, { viewport: { width: 1280.5 } }, { viewport: { width: '1280' } },
-    { viewport: { depth: 1 } },
+    { viewport: { depth: 1 } }, { scale: 0 }, { scale: 3 }, { scale: "2" }, { scale: null },
+    { maxHeight: 100 }, { fullPage: true, maxHeight: 0 }, { fullPage: true, maxHeight: 100001 }, { fullPage: true, maxHeight: "100" },
   ];
   for (const extra of bad) assert.throws(() => normalizeOptions({ url: origin, ...extra as object }), { code: 'INVALID_OPTIONS' }, JSON.stringify(extra));
 });
@@ -113,14 +115,14 @@ test('a full-page capture of a short page is at least one viewport tall', async 
   });
 });
 
-test('pages taller than the limit are truncated, disclosed, and still encode as WebP', async () => {
+test('PNG exceeds the former common cap while WebP is still truncated and disclosed', async () => {
   const tall = MAX_FULL_PAGE_HEIGHT + 4000;
   await withCapture(async capture => {
-    const png = await capture({ url: `${origin}/${tall}`, fullPage: true });
-    assert.deepEqual(pngSize(png.image), { width: 1920 * SCALE, height: MAX_FULL_PAGE_HEIGHT * SCALE });
+    const png = await capture({ url: `${origin}/${tall}`, fullPage: true, scroll: false, viewport: { width: 1280, height: 720 } });
+    assert.deepEqual(pngSize(png.image), { width: 1280 * SCALE, height: tall * SCALE });
     assert.equal(png.metadata.output.pageHeight, tall);
-    assert.equal(png.metadata.output.truncated, true);
-    const webp = await capture({ url: `${origin}/${tall}`, fullPage: true, format: 'webp' });
+    assert.equal(png.metadata.output.truncated, false);
+    const webp = await capture({ url: `${origin}/${tall}`, fullPage: true, format: 'webp', scroll: false });
     assert.equal(webp.image.subarray(8, 12).toString(), 'WEBP');
     assert.equal(webp.metadata.output.truncated, true);
   });
@@ -141,7 +143,7 @@ test('HTTP responses carry the format content type and a truncation header only 
     assert.equal(short.status, 200);
     assert.equal(short.headers.get('content-type'), 'image/jpeg');
     assert.equal(short.headers.get('x-difftrail-truncated'), null);
-    const cut = await post({ url: `${origin}/${MAX_FULL_PAGE_HEIGHT + 100}`, fullPage: true, format: 'webp' });
+    const cut = await post({ url: `${origin}/${MAX_FULL_PAGE_HEIGHT + 100}`, fullPage: true, format: 'webp', scroll: false });
     assert.equal(cut.status, 200);
     assert.equal(cut.headers.get('content-type'), 'image/webp');
     assert.equal(cut.headers.get('x-difftrail-truncated'), 'true');
@@ -152,4 +154,35 @@ test('HTTP responses carry the format content type and a truncation header only 
     await new Promise<void>(resolve => server.close(() => resolve()));
     await capture.close();
   }
+});
+
+
+test('scale 1 is explicit and preserves layout while changing output dimensions', async () => {
+  await withCapture(async capture => {
+    const result = await capture({ url: origin, scale: 1, viewport: { width: 640, height: 400 } });
+    assert.deepEqual(pngSize(result.image), { width: 640, height: 400 });
+    assert.equal(result.metadata.output.scale, 1);
+  });
+});
+
+test('maxHeight clips only full-page captures and reports the requested limit', async () => {
+  await withCapture(async capture => {
+    const result = await capture({ url: `${origin}/3000`, fullPage: true, maxHeight: 600, viewport: { width: 640, height: 720 } });
+    assert.deepEqual(pngSize(result.image), { width: 1280, height: 1200 });
+    assert.equal(result.metadata.output.truncated, true);
+    assert.deepEqual(result.metadata.output.truncationReasons, ['max-height']);
+    assert.equal(result.metadata.loading.scroll.steps, 0);
+  });
+});
+
+test('format and pixel caps use output pixels at the selected density', () => {
+  const options = normalizeOptions({ url: origin, fullPage: true, viewport: { width: 200 } });
+  assert.equal(captureHeightLimit({ ...options, format: 'webp' }).height, 8191);
+  assert.equal(captureHeightLimit({ ...options, format: 'jpeg' }).height, 32750);
+  assert.equal(captureHeightLimit({ ...options, format: 'jpeg', scale: 1 }).height, 65500);
+  assert.equal(captureHeightLimit({ ...options, format: 'webp', scale: 1 }).height, 16383);
+  const wide = { ...options, viewport: { width: 3840, height: 1080 }, format: 'png' as const };
+  const limit = captureHeightLimit(wide);
+  assert.equal(limit.height, Math.floor(MAX_OUTPUT_PIXELS / (3840 * 4)));
+  assert.ok(3840 * 4 * limit.height <= MAX_OUTPUT_PIXELS);
 });

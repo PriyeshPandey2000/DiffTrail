@@ -34,7 +34,7 @@ Use loading controls for pages with delayed content or lazy-loaded images:
 {"url":"https://example.com","fullPage":true,"waitUntil":"domcontentloaded","scroll":true,"delay":1000,"timeout":60000}
 ```
 
-You can also wait for a visible CSS selector with `waitForSelector`. See [loading controls](docs/api.md#loading-controls) for options, bounds, and timeout behavior.
+Pixel density stays at 2× by default; use `scale:1` for smaller images. Full-page requests scroll automatically unless `scroll:false` is passed, and captures briefly wait for relevant images within a bounded budget. You can also wait for a visible CSS selector with `waitForSelector`. See [loading controls](docs/api.md#loading-controls) for options, bounds, and timeout behavior.
 
 ## Features
 
@@ -114,7 +114,7 @@ Use [the benchmark guide](docs/benchmarks.md) for manual comparison tooling. Liv
 
 ## Current scope
 
-DiffTrail supports viewport and full-page screenshots as PNG, JPEG, or WebP. Configurable loading delays and waits, caching, consent-rejection automation, and AI cleanup are not implemented.
+DiffTrail supports viewport and full-page screenshots as PNG, JPEG, or WebP. Caching, consent-rejection automation, and AI cleanup are not implemented.
 
 The server binds to loopback and is intended for local development. Public hosting still requires authentication, outbound network isolation, abuse controls, and resolution of the advisory in the [dependency review](docs/dependency-audit.md).
 

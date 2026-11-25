@@ -42,15 +42,23 @@ All options are optional. Defaults reproduce the original behavior: a 1920×1080
 | `format` | `"png"`, `"jpeg"` (alias `"jpg"`), `"webp"` | `"png"` | Sets the response `Content-Type`. |
 | `quality` | integer 1–100 | `80` | JPEG and WebP only. Sending it with PNG is rejected. |
 | `viewport` | `{"width": 200–3840, "height": 200–4320}` | `1920` × `1080` | Either field may be omitted. |
+| `scale` | `1` or `2` | `2` | Output pixel density; preserves the CSS viewport layout. |
+| `maxHeight` | integer 1–100,000 CSS px | omitted | Requires `fullPage:true`; caps the capture height. |
 | `fullPage` | `true` or `false` | `false` | Captures the whole page height, up to the limit below. |
 
 ```json
 {"url":"https://example.com","format":"webp","quality":75,"fullPage":true,"viewport":{"width":1440,"height":900}}
 ```
 
-Pixel density is fixed at 2×, so the image is twice the viewport size: the default is 3840×2160.
+Pixel density defaults to **2×**: the default output is 3840×2160. Explicit `scale:1` produces one image pixel per CSS pixel and reduces image size and rendering work.
 
-Full-page captures are as wide as the viewport and at most 16,382 px tall (8,191 CSS px). Taller pages are cut off at that height, and the response says so with `X-DiffTrail-Truncated: true` and `output.truncated` in the metadata. The limit is the same for every format because WebP cannot encode more than 16,383 px on a side. Scrolling is off by default. Use `scroll:true` to trigger lazy-loaded content before capture.
+Full-page captures are bounded by the smallest of the requested `maxHeight`, the format limit, and the server's output-pixel budget. WebP supports at most 16,383 device pixels per side; JPEG is capped at the bundled Chromium encoder's measured 65,500-pixel boundary. PNG uses the pixel budget rather than inheriting WebP's height limit.
+
+The pixel budget is **125,813,760 output pixels**, retaining the former largest allowed image area. At density `scale`, the budget bounds CSS height to `floor(budget / (viewport.width × scale²))`. This is an output-area bound, not a guaranteed RAM allowance; deployment memory and concurrency still require measurement. No format, density, or page layout is silently changed to fit.
+
+When limited, the response includes `X-DiffTrail-Truncated: true`, `output.truncated`, and `output.truncationReasons` (`max-height`, `format-limit`, or `pixel-budget`). An explicit maxHeight can crop below the viewport height. Otherwise a short full-page capture is at least one viewport tall.
+
+Full-page requests scroll by default to trigger lazy-loaded content, stopping once the capturable region is reached or the step limit is exhausted. Use `scroll:false` to opt out. Viewport requests do not scroll unless explicitly requested.
 
 Two limits of full-page capture:
 
@@ -59,7 +67,7 @@ Two limits of full-page capture:
 
 ## Loading controls
 
-All durations are in milliseconds. Defaults preserve the existing capture behavior.
+All durations are in milliseconds. Viewport captures do not scroll by default; full-page captures scroll automatically unless disabled.
 
 | Option | Default | Behavior |
 | --- | --- | --- |
@@ -67,17 +75,23 @@ All durations are in milliseconds. Defaults preserve the existing capture behavi
 | `delay` | `0` | Extra wait before cleanup and capture; integer 0–10,000. |
 | `waitForSelector` | omitted | Wait for the first matching CSS element to be visible. Non-empty CSS selector, at most 1,000 characters. A missing or hidden element waits until the capture deadline, then returns 504. Invalid CSS returns 400. |
 | `timeout` | `30000` | Total request deadline, including browser setup, navigation, scroll, waits, cleanup and image encoding; integer 1,000–90,000. |
-| `scroll` | `false` | `true` or an object with `step`, `delay`, and `maxSteps`. Scrolls the document, then returns to the top before selector waits, extra delay, cleanup, and capture. |
+| `scroll` | `true` for full page, otherwise `false` | `true` or an object with `step`, `delay`, and `maxSteps`. Scrolls the document, then returns to the top before selector waits, extra delay, cleanup, and capture. |
 
 ```json
 {"url":"https://example.com","fullPage":true,"waitUntil":"domcontentloaded","scroll":true,"waitForSelector":"main","delay":1000,"timeout":60000}
 ```
 
-Scroll defaults: step = 80% of viewport height (at most 800 CSS px), delay = 200 ms between steps, and maxSteps = 30. Custom bounds: step 100–2,000 CSS px, delay 0–1,000 ms, maxSteps 1–100. For example, `"scroll":{"step":500,"delay":300,"maxSteps":20}`. Infinite pages stop at the step limit; scroll locks are reported without attempting to unlock the page. Inner scrolling containers are not traversed. Reaching a page bottom does not guarantee every image finished loading; use a selector or extra delay when needed. The full-page image height limit still applies.
+Scroll defaults: step = 80% of viewport height (at most 800 CSS px), delay = 200 ms between steps, and maxSteps = 30. Custom bounds: step 100–2,000 CSS px, delay 0–1,000 ms, maxSteps 1–100. For example, `"scroll":{"step":500,"delay":300,"maxSteps":20}`. Infinite pages stop at the step limit; scroll locks are reported without attempting to unlock the page. Inner scrolling containers are not traversed. Reaching the bottom of the capturable region does not guarantee every image finished loading. Format, pixel-budget, and requested height limits still apply.
 
 The metadata header includes `loading`: effective wait event, delay, total timeout, selector state (`matched` or `not-requested`), and `scroll.status` (`completed`, `limited`, `blocked`, or `not-requested`) with step count. Raw mode still skips cleanup and residual inspection even when loading controls are requested.
 
 Timeouts remain strict: DiffTrail returns a 504 JSON error rather than silently capturing an incomplete page. `domcontentloaded` is useful when slow images or trackers prevent `load`. Choosing an earlier event can capture unfinished content. These options do not bypass HTTP errors or access challenges.
+
+### Automatic image readiness
+
+After cleanup and before capture, DiffTrail waits up to 1,500 ms for relevant main-document `img` elements, exiting early when there are no pending or untriggered images. The shared request deadline still applies. HTTP image failures are recorded without waiting for them to recover; permanently pending requests cannot extend this budget. Images outside the capturable region are ignored.
+
+`loading.images` reports `state` (`ready`, `incomplete`, or `unknown`), loaded/failed/pending/untriggered counts, and elapsed time. Inspection is limited to 10,000 main-document images. This is not a guarantee for CSS backgrounds, iframe/shadow images, videos, or canvas content. Missing images do not turn an otherwise successful capture into an error. There is no additional fixed delay when relevant images are already ready.
 
 ## Result headers
 
@@ -87,7 +101,7 @@ Responses use the `Content-Type` of the requested format (`image/png`, `image/jp
 - `X-DiffTrail-Residual`: `not-checked` in raw mode; otherwise `none-detected`, `suspected`, `unknown` or `blocked`.
 - `X-DiffTrail-Rules-Version`: the verified local build fingerprint, or `none`.
 - `X-DiffTrail-Truncated`: `true`, present only when a full-page capture was cut at the height limit.
-- `X-DiffTrail-Metadata`: JSON containing the image `output` (format, quality, viewport, `fullPage`, `truncated`, and the measured `pageHeight` for full-page captures), the engine, categories, filter IDs, SDK/reference versions, setup/capture times, residual signals, consent behavior and `aiUsed`.
+- `X-DiffTrail-Metadata`: JSON containing the image `output` (format, quality, scale, maxHeight, viewport, `fullPage`, `truncated`, truncation reasons, and the measured `pageHeight` for full-page captures), the engine, categories, filter IDs, SDK/reference versions, setup/capture times, residual signals, consent behavior and `aiUsed`.
 
 `enabled` does not mean every banner was removed. The official SDK does not supply a verified count of hidden elements; `hidden`, `guarded` and `blockedRequests` are `null` rather than invented counts. Residual detection is read-only, bounded and heuristic. Legitimate dialogs can be flagged. No detector output guarantees a clear page.
 

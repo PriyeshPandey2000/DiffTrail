@@ -56,19 +56,22 @@ test('default capture uses the official runtime and reports unverifiable counts 
   } finally {await capture.close();}
 });
 
-test('the requested viewport reaches the official runtime', async () => {
+test('the requested viewport and density reach the official runtime', async () => {
   let received: { width: number; height: number } | undefined;
+  const scales: number[] = [];
   const fakeContext = { close: async () => {}, newPage: async () => ({ setDefaultTimeout() {}, setDefaultNavigationTimeout() {}, goto: async () => null,
     waitForSelector: async () => null, waitForTimeout: async () => {}, frames: () => [], evaluate: async () => 0, screenshot: async () => Buffer.from('fake') }) };
   const capture = createCaptureService({ settleMs: 0, adguardFactory: async (categories, options) => {
     received = options.viewport;
+    scales.push(options.scale);
     return { context: fakeContext, close: async () => {}, metadata: { engine: 'adguard-api-mv3', package: 'test', referenceVersion: 'test', rulesVersion: 'test', filters: [18, 19], rulesCount: 0, setupMs: 0 } };
   } });
   try {
-    await capture({ url: 'https://example.com', cleanup: 'standard', viewport: { width: 1280, height: 720 } });
+    await capture({ url: 'https://example.com', cleanup: 'standard', viewport: { width: 1280, height: 720 }, scale: 1 });
     assert.deepEqual(received, { width: 1280, height: 720 });
     await capture({ url: 'https://example.com', cleanup: 'standard' });
     assert.deepEqual(received, { width: 1920, height: 1080 });
+    assert.deepEqual(scales, [1, 2]);
   } finally { await capture.close(); }
 });
 
@@ -86,8 +89,10 @@ test('headless official runtime loads selected filters and hides an upstream ban
 test('headless official capture observes delayed banners and returns a PNG', {skip:!enabled},async()=>{
   const capture=createCaptureService();
   try{
-    const result=await capture({url:`${origin}/delayed`,cleanup:'standard',waitForSelector:'main',scroll:{maxSteps:2,delay:0},delay:50});
+    const result=await capture({url:`${origin}/delayed`,cleanup:'standard',waitForSelector:'main',scroll:{maxSteps:2,delay:0},delay:50,scale:1,viewport:{width:640,height:400}});
     assert.equal(result.image.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+    assert.equal(result.image.readUInt32BE(16),640);
+    assert.equal(result.image.readUInt32BE(20),400);
     assert.equal(result.metadata.engine,'adguard-api-mv3');
     assert.equal(result.metadata.residual.state,'none-detected');
   }finally{await capture.close();}
