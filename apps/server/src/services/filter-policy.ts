@@ -1,7 +1,7 @@
 import { CosmeticFilter, NetworkFilter } from '@ghostery/adblocker-playwright';
 
 // Keep the website knowledge in upstream lists. This policy only limits actions.
-export function selectRule(line, category) {
+export function selectRule(line: string, category: string): { rule: string; kind: 'cosmetic' | 'network'; reason?: never } | { reason: string; rule?: never; kind?: never } {
   line = line.trim();
   if (!line || line.startsWith('!') || line.startsWith('[')) return { reason: 'comment' };
   if (/#[@?$%]*#/.test(line)) {

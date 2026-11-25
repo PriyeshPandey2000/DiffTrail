@@ -1,8 +1,23 @@
+import type { AdguardWorker, BrowserLauncher, CaptureBrowser, CaptureContext, CaptureMetadata, CaptureResult, CaptureService, CleanupCategories, Residual } from './types.ts';
+import type { Blocker } from './blocker.ts';
+
 import { chromium } from 'playwright';
-import { loadBlocker, applyCosmetics, inspectPage, attachNetworkBlocking } from './blocker.js';
-import { createAdguardContext } from './adguard-context.js';
-import { CaptureError, normalizeOptions } from './options.js';
-export { CaptureError } from './options.js';
+import { loadBlocker, applyCosmetics, inspectPage, attachNetworkBlocking } from './blocker.ts';
+import { createAdguardContext } from './adguard-context.ts';
+import { CaptureError, normalizeOptions } from './options.ts';
+export { CaptureError } from './options.ts';
+
+export interface CaptureServiceOptions {
+  browserType?: BrowserLauncher;
+  headless?: boolean;
+  cleanupEngine?: 'adguard' | 'cosmetic';
+  adguardFactory?: (categories: CleanupCategories, options: { headless: boolean; timeoutMs: number }) => Promise<AdguardWorker>;
+  blockerLoader?: typeof loadBlocker;
+  maxConcurrent?: number;
+  captureTimeout?: number;
+  settleMs?: number;
+  recycleAfter?: number;
+}
 
 export function createCaptureService({
   browserType = chromium,
@@ -14,9 +29,11 @@ export function createCaptureService({
   captureTimeout = 30_000,
   settleMs = 4500,
   recycleAfter = 100,
-} = {}) {
-  let active = 0, uses = 0, browser, launching, closed = false;
-  const openContexts = new Set();
+}: CaptureServiceOptions = {}): CaptureService {
+  let active = 0, uses = 0, closed = false;
+  let browser: CaptureBrowser | undefined;
+  let launching: Promise<CaptureBrowser> | undefined;
+  const openContexts = new Set<() => Promise<void>>();
   const closeBrowser = async () => {
     const current = browser;
     browser = undefined;
@@ -35,19 +52,23 @@ export function createCaptureService({
     }
     return launching;
   };
-  async function capture(input) {
+  async function capture(input: unknown): Promise<CaptureResult> {
     const options = normalizeOptions(input);
     if (closed) throw new CaptureError('SERVICE_CLOSED', 'Capture service is closed.', 503);
     if (active >= maxConcurrent) throw new CaptureError('CAPACITY_EXCEEDED', 'Capture capacity reached. Try again shortly.', 503);
     active++;
     const start = Date.now();
-    let context, nativeWorker, timer, closingContext, expired = false;
+    let context: CaptureContext | undefined;
+    let nativeWorker: AdguardWorker | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let closingContext: Promise<void> | undefined;
+    let expired = false;
     const closeContext = async () => {
       if (!context) return;
       closingContext ||= (async () => {
         try {
           if (nativeWorker) await nativeWorker.close();
-          else await context.close();
+          else await context?.close();
         } finally { openContexts.delete(closeContext); }
       })();
       return closingContext;
@@ -56,15 +77,15 @@ export function createCaptureService({
       if (closed) throw new CaptureError('SERVICE_CLOSED', 'Capture service is closed.', 503);
       if (expired || Date.now() - start >= captureTimeout) throw new CaptureError('CAPTURE_TIMEOUT', 'Capture exceeded its time limit.', 504);
     };
-    const deadline = new Promise((_, reject) => {
+    const deadline = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         expired = true;
         reject(new CaptureError('CAPTURE_TIMEOUT', 'Capture exceeded its time limit.', 504));
       }, captureTimeout);
     });
-    const work = async () => {
+    const work = async (): Promise<CaptureResult> => {
       const requested = Object.values(options.cleanup).some(Boolean);
-      let blocker;
+      let blocker: Blocker | undefined;
       if (requested && cleanupEngine === 'cosmetic') {
         try { blocker = await blockerLoader(options.cleanup); }
         catch { throw new CaptureError('CLEANUP_UNAVAILABLE', 'Unable to load the bundled cleanup rules.', 503); }
@@ -98,7 +119,7 @@ export function createCaptureService({
             { upstreamStatus, ...(challenge ? { reason: 'browser-verification' } : {}) });
         }
         const summary = { hidden: 0, guarded: 0, invalid: 0, framesSkipped: 0 };
-        let residual = { state: 'not-checked', signals: [] };
+        let residual: Residual = { state: 'not-checked', signals: [] };
         let failed = false, transientFrameErrors = 0;
         if (nativeWorker) {
           // AdGuard's maintained content scripts observe and apply its rules.
@@ -137,7 +158,7 @@ export function createCaptureService({
         const incomplete = failed || summary.framesSkipped > 0 || summary.invalid > 0 || counters.networkErrors > 0;
         const status = !requested ? 'skipped' : nativeWorker ? (residual.state === 'none-detected' ? 'enabled' : 'partial') : incomplete ? (applied ? 'partial' : 'failed')
           : applied ? (residual.state === 'none-detected' ? 'applied' : 'partial') : 'unchanged';
-        const metadata = {
+        const metadata: CaptureMetadata = {
           status, categories: options.cleanup, engine: nativeWorker ? 'adguard-api-mv3' : blocker ? 'ghostery-cosmetic-experiment' : 'none',
           rulesVersion: nativeWorker?.metadata.rulesVersion ?? blocker?.version ?? null,
           ...summary, ...counters, transientFrameErrors, residual, consent: 'none', aiUsed: false,
@@ -155,7 +176,7 @@ export function createCaptureService({
       return await Promise.race([work(), deadline]);
     } catch (error) {
       if (error instanceof CaptureError) throw error;
-      if (error.name === 'TimeoutError') throw new CaptureError('CAPTURE_TIMEOUT', 'Capture exceeded its time limit.', 504);
+      if (error instanceof Error && error.name === 'TimeoutError') throw new CaptureError('CAPTURE_TIMEOUT', 'Capture exceeded its time limit.', 504);
       throw new CaptureError('CAPTURE_FAILED', 'Unable to capture the target page.', 502);
     } finally {
       clearTimeout(timer);

@@ -1,16 +1,21 @@
+import type { Browser, BrowserContext, LaunchOptions } from 'playwright';
+import type { CaptureServiceOptions } from '../src/services/capture.ts';
+import type { CaptureContext, CaptureHandler, CaptureMetadata, CaptureService } from '../src/services/types.ts';
+
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import http from 'node:http';
 import { after, before, test } from 'node:test';
 import { chromium } from 'playwright';
-import { createApp } from '../src/app.js';
-import { createCaptureService as createService } from '../src/services/capture.js';
+import { createApp } from '../src/app.ts';
+import { createCaptureService as createService } from '../src/services/capture.ts';
 // Keep the earlier cosmetic candidate's regressions independent of the native extension.
-const createCaptureService = options => createService({ cleanupEngine: 'cosmetic', ...options });
-import { normalizeOptions } from '../src/services/options.js';
-import { cases } from './fixtures/cleanup.js';
+const createCaptureService = (options: CaptureServiceOptions = {}) => createService({ cleanupEngine: 'cosmetic', ...options });
+import { normalizeOptions } from '../src/services/options.ts';
+import { cases } from './fixtures/cleanup.ts';
 
-let target, origin;
+let target: http.Server;
+let origin: string;
 before(async () => {
   target = http.createServer((req, res) => {
     if (req.url === '/challenge') {
@@ -24,39 +29,41 @@ before(async () => {
     res.writeHead(req.url === '/missing' ? 404 : 200, { 'Content-Type': 'text/html' });
     if (req.url === '/ads-fixture') return res.end('<body style="background:blue"><script src="/wp-content/plugins/adrotate/a.js"></script></body>');
     if (req.url === '/state') return res.end(`<body><script>document.body.style.background=(localStorage.session||document.cookie.includes('session='))?'red':'blue';localStorage.session='yes';document.cookie='session=yes'</script></body>`);
-    res.end(cases[req.url.slice(1)]?.html || cases.banner.html);
+    res.end(cases[(req.url || '/').slice(1)]?.html || cases.banner.html);
   });
   origin = await listen(target);
 });
 after(async () => close(target));
-async function listen(server) {
+async function listen(server: http.Server) {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
-  return `http://127.0.0.1:${server.address().port}`;
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  return `http://127.0.0.1:${address.port}`;
 }
-async function close(server) {
+async function close(server: http.Server) {
   server.closeAllConnections();
-  await new Promise(resolve => server.close(resolve));
+  await new Promise<void>(resolve => server.close(() => resolve()));
 }
-async function withApi(capture, run) {
+async function withApi(capture: CaptureHandler, run: (post: (body: unknown) => Promise<Response>, url: string) => Promise<void>) {
   const server = http.createServer(createApp({ capture }));
   const url = await listen(server);
-  const post = body => fetch(`${url}/api/screenshot`, {
+  const post = (body: unknown) => fetch(`${url}/api/screenshot`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   try { await run(post, url); }
   finally { await close(server); await capture.close?.(); }
 }
-async function withCapture(options, run) {
+async function withCapture(options: CaptureServiceOptions, run: (capture: CaptureService) => Promise<void>) {
   const capture = createCaptureService({ settleMs: 0, ...options });
   try { await run(capture); } finally { await capture.close(); }
 }
-function assertPng(image) {
+function assertPng(image: Buffer) {
   assert.equal(image.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   assert.equal(image.readUInt32BE(16), 3840);
   assert.equal(image.readUInt32BE(20), 2160);
 }
-const meta = response => JSON.parse(response.headers.get('x-difftrail-metadata'));
+const meta = (response: Response): CaptureMetadata => JSON.parse(response.headers.get('x-difftrail-metadata') || 'null');
 
 test('raw HTTP capture loads no blocker, requires no key, and performs no residual scan', async () => {
   await withApi(createCaptureService({ blockerLoader: () => assert.fail('Raw mode loaded rules') }), async post => {
@@ -87,6 +94,7 @@ test('standard cleanup returns a changed PNG and versioned outcome headers witho
     assert.equal(metadata.aiUsed, false);
     assert.equal(metadata.consent, 'none');
     assert.equal(metadata.residual.state, 'none-detected');
+    assert.ok(metadata.rulesVersion);
     assert.match(metadata.rulesVersion, /^[a-f0-9]{16}$/);
     assert.equal(response.headers.get('x-difftrail-rules-version'), metadata.rulesVersion);
     assert.equal(metadata.blockedRequests, 0);
@@ -118,7 +126,7 @@ test('protected login UI is retained and reported as suspected rather than remov
     const result = await capture({ url: `${origin}/login`, cleanup: 'standard' });
     assert.equal(result.cleanup, 'unchanged');
     assert.equal(result.metadata.hidden, 0);
-    assert.ok(result.metadata.guarded > 0);
+    assert.ok(result.metadata.guarded !== null && result.metadata.guarded > 0);
     assert.equal(result.metadata.residual.state, 'suspected');
     assert.deepEqual(result.image, raw.image);
   });
@@ -173,8 +181,8 @@ test('requested rules failing to initialize return 503; raw capture still works'
 
 test('browser is reused, contexts close, and cookies/storage do not leak between requests', async () => {
   let launches = 0;
-  const contexts = [];
-  const browserType = { launch: async options => {
+  const contexts: BrowserContext[] = [];
+  const browserType = { launch: async (options: LaunchOptions) => {
     launches++;
     const instance = await chromium.launch(options);
     const original = instance.newContext.bind(instance);
@@ -193,7 +201,7 @@ test('browser is reused, contexts close, and cookies/storage do not leak between
 
 test('simultaneous requests share one browser and return separate PNGs', async () => {
   let launches = 0;
-  const browserType = { launch: async options => { launches++; return chromium.launch(options); } };
+  const browserType = { launch: async (options: LaunchOptions) => { launches++; return chromium.launch(options); } };
   await withApi(createCaptureService({ browserType }), async post => {
     const responses = await Promise.all([post({ url: origin }), post({ url: `${origin}/none` })]);
     const images = [];
@@ -209,8 +217,8 @@ test('simultaneous requests share one browser and return separate PNGs', async (
 });
 
 test('browser disconnect recovers on the next request', async () => {
-  const browsers = [];
-  const browserType = { launch: async options => { const instance = await chromium.launch(options); browsers.push(instance); return instance; } };
+  const browsers: Browser[] = [];
+  const browserType = { launch: async (options: LaunchOptions) => { const instance = await chromium.launch(options); browsers.push(instance); return instance; } };
   await withCapture({ browserType }, async capture => {
     await capture({ url: origin });
     await browsers[0].close();
@@ -221,7 +229,7 @@ test('browser disconnect recovers on the next request', async () => {
 
 test('browser recycling occurs between requests', async () => {
   let launches = 0;
-  const browserType = { launch: async options => { launches++; return chromium.launch(options); } };
+  const browserType = { launch: async (options: LaunchOptions) => { launches++; return chromium.launch(options); } };
   await withCapture({ browserType, recycleAfter: 1 }, async capture => {
     await capture({ url: origin });
     await capture({ url: origin });
@@ -250,11 +258,11 @@ test('upstream browser challenges expose the target status and reason in JSON', 
 
 test('deadline releases capacity and closes a browser whose context creation stalled', async () => {
   let closed = 0;
-  let started;
-  const launchStarted = new Promise(resolve => { started = resolve; });
+  let started!: () => void;
+  const launchStarted = new Promise<void>(resolve => { started = resolve; });
   const browserType = { launch: async () => {
     started();
-    return { newContext: () => new Promise(() => {}), close: async () => { closed++; } };
+    return { newContext: () => new Promise<CaptureContext>(() => {}), close: async () => { closed++; } };
   } };
   await withCapture({ browserType, maxConcurrent: 1, captureTimeout: 50 }, async capture => {
     const pending = capture({ url: origin });
@@ -269,12 +277,13 @@ test('deadline releases capacity and closes a browser whose context creation sta
 });
 
 test('late-created contexts are closed after the request deadline', async () => {
-  let resolveContext, closes = 0;
-  const created = new Promise(resolve => { resolveContext = resolve; });
+  let resolveContext!: (context: CaptureContext) => void;
+  let closes = 0;
+  const created = new Promise<CaptureContext>(resolve => { resolveContext = resolve; });
   const browserType = { launch: async () => ({ newContext: () => created, close: async () => {} }) };
   await withCapture({ browserType, captureTimeout: 50 }, async capture => {
     await assert.rejects(capture({ url: origin }), { code: 'CAPTURE_TIMEOUT' });
-    resolveContext({ close: async () => { closes++; } });
+    resolveContext({ newPage: async () => assert.fail('Expired context must not create a page'), close: async () => { closes++; } });
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(closes, 1);
   });

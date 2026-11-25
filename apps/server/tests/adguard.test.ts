@@ -1,3 +1,5 @@
+import type { AdguardWorker } from '../src/services/types.ts';
+
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
@@ -6,25 +8,28 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { before, after, test } from 'node:test';
-import { createCaptureService } from '../src/services/capture.js';
-import { createAdguardContext, selectFilters } from '../src/services/adguard-context.js';
-import { normalizeOptions } from '../src/services/options.js';
-import { cases } from './fixtures/cleanup.js';
+import { createCaptureService } from '../src/services/capture.ts';
+import { createAdguardContext, selectFilters } from '../src/services/adguard-context.ts';
+import { normalizeOptions } from '../src/services/options.ts';
+import { cases } from './fixtures/cleanup.ts';
 
 const enabled = process.env.RUN_ADGUARD_TESTS === '1';
-let server, origin;
+let server: http.Server | undefined;
+let origin: string;
 before(async () => {
   if (!enabled) return;
   await access(new URL('../../../.cache/adguard-runtime/extension/build.json', import.meta.url));
   server = http.createServer((req,res)=> {
     res.setHeader('Content-Type', 'text/html');
-    res.end(cases[req.url.slice(1)]?.html || cases.banner.html);
+    res.end(cases[(req.url || '/').slice(1)]?.html || cases.banner.html);
   });
   server.listen(0,'127.0.0.1'); await once(server,'listening');
-  origin=`http://127.0.0.1:${server.address().port}`;
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  origin=`http://127.0.0.1:${address.port}`;
 });
 after(async () => {
-  if(server){server.closeAllConnections(); await new Promise(resolve=>server.close(resolve));}
+  if(server){server.closeAllConnections(); await new Promise<void>(resolve=>server!.close(()=>resolve()));}
 });
 
 test('category mapping selects upstream filters, never custom rules', () => {
@@ -36,11 +41,11 @@ test('category mapping selects upstream filters, never custom rules', () => {
 
 test('default capture uses the official runtime and reports unverifiable counts as null', async () => {
   let calls=0, closes=0;
-  const fakeContext={newPage:async()=>({setDefaultTimeout(){},setDefaultNavigationTimeout(){},goto:async()=>null,
+  const fakeContext={close:async()=>{},newPage:async()=>({setDefaultTimeout(){},setDefaultNavigationTimeout(){},goto:async()=>null,
     waitForTimeout:async()=>{},frames:()=>[],screenshot:async()=>Buffer.from('fake')})};
   const capture=createCaptureService({settleMs:0,adguardFactory:async categories=>{
     calls++;assert.equal(categories.cookies,true);
-    return {context:fakeContext,close:async()=>{closes++},metadata:{rulesVersion:'test',filters:[18,19]}};
+    return {context:fakeContext,close:async()=>{closes++},metadata:{engine:'adguard-api-mv3',package:'test',referenceVersion:'test',rulesVersion:'test',filters:[18,19],rulesCount:0,setupMs:0}};
   }});
   try {
     const result=await capture({url:'https://example.com',cleanup:'standard'});
@@ -56,7 +61,7 @@ test('headless official runtime loads selected filters and hides an upstream ban
   try{
     assert.deepEqual(worker.metadata.filters,[18,19]);
     const page=await worker.context.newPage();await page.goto(origin);
-    await page.waitForFunction(()=>getComputedStyle(document.querySelector('#cookie-banner')).display==='none',{},{timeout:7000});
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('#cookie-banner')!).display==='none',{},{timeout:7000});
     assert.equal(await page.locator('main').isVisible(),true);
     assert.equal(await page.evaluate(()=>window.accepts),0);
   }finally{await worker.close();}
@@ -92,21 +97,21 @@ test('native cleanup loads from a checkout path containing spaces and Unicode', 
   const project = await mkdtemp(resolve(tmpdir(), 'difftrail space é-'));
   const services = resolve(project, 'apps/server/src/services');
   const cache = resolve(project, '.cache/adguard-runtime');
-  let worker;
+  let worker: AdguardWorker<import('playwright').BrowserContext> | undefined;
   try {
     await mkdir(services, { recursive: true });
     await mkdir(cache, { recursive: true });
     await writeFile(resolve(project, 'package.json'), '{"type":"module"}');
     await symlink(fileURLToPath(new URL('../../../node_modules', import.meta.url)), resolve(project, 'node_modules'), 'dir');
     await symlink(fileURLToPath(new URL('../../../.cache/adguard-runtime/extension', import.meta.url)), resolve(cache, 'extension'), 'dir');
-    for (const name of ['adguard-context.js', 'options.js']) {
+    for (const name of ['adguard-context.ts', 'options.ts']) {
       await copyFile(new URL(`../src/services/${name}`, import.meta.url), resolve(services, name));
     }
-    const { createAdguardContext: createFromCheckout } = await import(pathToFileURL(resolve(services, 'adguard-context.js')).href);
+    const { createAdguardContext: createFromCheckout } = await import(pathToFileURL(resolve(services, 'adguard-context.ts')).href) as typeof import('../src/services/adguard-context.ts');
     worker = await createFromCheckout({ cookies: true, popups: true }, { timeoutMs: 10_000 });
     const page = await worker.context.newPage();
     await page.goto(origin);
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('#cookie-banner')).display === 'none');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#cookie-banner')!).display === 'none');
     assert.equal(await page.locator('main').isVisible(), true);
     assert.deepEqual(worker.metadata.filters, [18, 19]);
   } finally {

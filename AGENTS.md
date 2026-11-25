@@ -19,6 +19,7 @@
 
 ## Verification
 
+- Run `npm run typecheck` and `npm run build` for TypeScript changes.
 - Run `npm test` for local fixture checks.
 - Changes to the native AdGuard integration also require `npm run setup:adguard`
   and `npm run test:adguard`; the normal test command skips the native checks.

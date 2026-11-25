@@ -1,8 +1,11 @@
+import type { Residual } from './types.ts';
+
 // Runs in a document. The rule engine supplies selectors; this code supplies
 // geometry checks and a generic content guard, never website-specific rules.
-export function inspectDOM({ selectors = [], apply = false } = {}) {
-  const roots = [document];
-  const elements = [];
+export function inspectDOM(options: { selectors?: string[]; apply?: boolean } | void = {}) {
+  const { selectors = [], apply = false } = options || {};
+  const roots: (Document | ShadowRoot)[] = [document];
+  const elements: Element[] = [];
   for (let index = 0; index < roots.length && elements.length < 20_000; index++) {
     for (const element of roots[index].querySelectorAll('*')) {
       elements.push(element);
@@ -10,15 +13,18 @@ export function inspectDOM({ selectors = [], apply = false } = {}) {
       if (elements.length === 20_000) break;
     }
   }
-  const visible = element => {
+  const visible = (element: Element) => {
     const box = element.getBoundingClientRect();
     return box.width > 0 && box.height > 0 && box.bottom > 0 && box.right > 0
       && box.top < innerHeight && box.left < innerWidth
       && element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
   };
-  const parent = element => element.parentElement || element.getRootNode().host;
+  const parent = (element: Element): Element | null => {
+    const root = element.getRootNode();
+    return element.parentElement || (root instanceof ShadowRoot ? root.host : null);
+  };
   const textLength = Math.max(1, document.body?.textContent?.length || 0);
-  const protectedElement = element => {
+  const protectedElement = (element: Element) => {
     if (['HTML', 'BODY', 'MAIN', 'ARTICLE', 'NAV', 'HEADER', 'FOOTER'].includes(element.tagName)) return true;
     if (element.querySelector('main,article,nav,[role="main"],input[type="password"],input[autocomplete^="cc-"]')) return true;
     if (element.matches('[role="main"],[role="navigation"],[role="application"],input[type="password"],input[autocomplete^="cc-"]')) return true;
@@ -46,23 +52,24 @@ export function inspectDOM({ selectors = [], apply = false } = {}) {
             : Array.from(element.querySelectorAll('*')).slice(0, 1000).filter(visible);
           if (!visibleTargets.length) continue;
           if (protectedElement(element)) { guarded++; continue; }
-          element.style.setProperty('display', 'none', 'important');
+          (element as HTMLElement | SVGElement).style.setProperty('display', 'none', 'important');
           if (visibleTargets.every(target => !visible(target))) hidden++;
         }
       }
     }
   }
-  const features = { classes: [], ids: [], hrefs: [] };
+  const features: Record<'classes' | 'ids' | 'hrefs', string[]> = { classes: [], ids: [], hrefs: [] };
   for (const element of elements) {
     features.classes.push(...element.classList);
     if (element.id) features.ids.push(element.id);
-    if (element.hasAttribute('href')) features.hrefs.push(element.getAttribute('href'));
+    const href = element.getAttribute('href');
+    if (href !== null) features.hrefs.push(href);
   }
-  for (const key of Object.keys(features)) features[key] = [...new Set(features[key])];
+  for (const key of Object.keys(features) as (keyof typeof features)[]) features[key] = [...new Set(features[key])];
   const scrollLocked = [document.documentElement, document.body].some(element => element
     && (['hidden', 'clip'].includes(getComputedStyle(element).overflowY) || getComputedStyle(element).position === 'fixed'))
     && Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight || 0) > innerHeight;
-  const hits = new Map();
+  const hits = new Map<Element, { count: number; center: boolean }>();
   for (let row = 0; row < 9; row++) for (let col = 0; col < 9; col++) {
     const top = document.elementFromPoint(innerWidth * (col + 0.5) / 9, innerHeight * (row + 0.5) / 9);
     for (let element = top; element && element !== document.documentElement; element = parent(element)) {
@@ -103,7 +110,7 @@ export function inspectDOM({ selectors = [], apply = false } = {}) {
   const signals = [...new Set(candidates.flatMap(candidate => candidate.reasons))];
   if (scrollLocked) signals.push('scroll-lock');
   if (elements.length >= 20_000) signals.push('scan-limit');
-  const residual = blocked ? 'blocked' : candidates.length ? 'suspected'
+  const residual: Residual['state'] = blocked ? 'blocked' : candidates.length ? 'suspected'
     : signals.length ? 'unknown' : 'none-detected';
   return { features, hidden, guarded, invalid, residual, signals,
     candidates: candidates.map(({ element, ...candidate }) => candidate) };

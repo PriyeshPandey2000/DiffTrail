@@ -4,7 +4,7 @@ A local PNG screenshot API using headless Playwright and AdGuard's official MV3 
 
 ## Setup
 
-Use Node.js 22+, npm 10.9.11 and `unzip`. npm 10 is pinned because npm 11 can
+Use Node.js 22.18+, npm 10.9.11 and `unzip`. npm 10 is pinned because npm 11 can
 ignore workspace dependency overrides. From the repository root:
 
 ```sh
@@ -16,7 +16,7 @@ npm start
 
 `setup:adguard` installs Playwright Chromium, verifies the pinned AdGuard archive, and builds the official API integration with its bundled filters, scriptlets and redirect assets. It does not install anything in your personal browser. No API key, browser-store account or Docker is needed. Runtime captures do not download filter lists. On Linux, install browser system dependencies with `npm exec --workspace=server -- playwright install --with-deps chromium` if needed. Windows contributors can use WSL2.
 
-The server binds to `http://127.0.0.1:3000`; set `PORT` in `.env` to change it. `npm run dev` enables watch mode. For raw captures alone, `npm run setup:browser` is sufficient.
+The server binds to `http://127.0.0.1:3000`; set `PORT` in `.env` to change it. `npm start` compiles TypeScript into `apps/server/dist` and runs the compiled server. `npm run dev` runs the TypeScript source directly with Node’s watch mode. For raw captures alone, `npm run setup:browser` is sufficient.
 
 ## Capture and view an image
 
@@ -94,6 +94,8 @@ This is a trusted local development API, not public hosting: authentication, out
 ## Verify and reproduce
 
 ```sh
+npm run typecheck
+npm run build
 npm test
 # Also run the real AdGuard runtime fixture checks after setup:
 npm run test:adguard
@@ -101,10 +103,12 @@ npm run test:adguard
 npm run smoke:api -- onetrust cookiebot guardian booking
 ```
 
+The server and tests use strict TypeScript. Node 22.18+ runs the test and development source with native type stripping; `typecheck` is a separate required check. The build emits JavaScript with relative imports rewritten for Node. Benchmark and filter-update scripts remain JavaScript.
+
 The normal suite includes the retained cosmetic-candidate regressions; that candidate is not the API default. Real native-runtime tests are explicit because they require the generated extension assets. Tests need no AI key or credits. Live checks are not CI gates.
 
-GitHub Actions installs Chromium with Linux dependencies, builds the pinned
-AdGuard runtime and runs `test:adguard`, including native path and isolation checks.
+GitHub Actions checks strict TypeScript types, compiles the server, installs
+Chromium with Linux dependencies, builds the pinned AdGuard runtime and runs `test:adguard`, including native path and isolation checks.
 `npm run audit:dependencies` fails for new advisories while displaying the
 reviewed, unresolved Zod finding described in [dependency review](docs/dependency-audit.md).
 
@@ -123,7 +127,7 @@ The reference and adapted example use the same pinned compiled assets. See [head
 
 These earlier full-extension experiments are separate from the current official AdGuard API integration. They install no extension in your personal browser.
 
-From a fresh clone on macOS or Linux (Node.js 22+, and `unzip` available):
+From a fresh clone on macOS or Linux (Node.js 22.18+, and `unzip` available):
 
 ```sh
 npm ci

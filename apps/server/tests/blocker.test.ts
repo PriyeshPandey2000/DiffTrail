@@ -1,3 +1,6 @@
+import type { Browser, BrowserContext, Page } from 'playwright';
+import type { Blocker, FilterManifest } from '../src/services/blocker.ts';
+
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
@@ -7,21 +10,26 @@ import { gunzipSync } from 'node:zlib';
 import { after, before, test } from 'node:test';
 import { chromium } from 'playwright';
 import { CosmeticFilter, PlaywrightBlocker, Request } from '@ghostery/adblocker-playwright';
-import { loadBlocker, applyCosmetics, inspectPage } from '../src/services/blocker.js';
-import { inspectDOM } from '../src/services/dom.js';
-import { selectRule } from '../src/services/filter-policy.js';
-import { cases, iframeFixture } from './fixtures/cleanup.js';
+import { loadBlocker, applyCosmetics, inspectPage } from '../src/services/blocker.ts';
+import { inspectDOM } from '../src/services/dom.ts';
+import { selectRule } from '../src/services/filter-policy.ts';
+import { cases, iframeFixture } from './fixtures/cleanup.ts';
 
-let browser, server, origin, blocker;
+let browser: Browser;
+let server: http.Server;
+let origin: string;
+let blocker: Blocker;
 before(async () => {
   server = http.createServer((req, res) => {
-    const name = req.url.slice(1);
+    const name = (req.url || '/').slice(1);
     res.setHeader('Content-Type', 'text/html');
     res.end(name === 'iframe' || name === 'cross-frame' ? iframeFixture(origin, name === 'cross-frame') : (cases[name]?.html || cases.none.html));
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
-  origin = `http://127.0.0.1:${server.address().port}`;
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  origin = `http://127.0.0.1:${address.port}`;
   browser = await chromium.launch();
   blocker = await loadBlocker({ cookies: true, popups: true });
 });
@@ -29,10 +37,10 @@ after(async () => {
   await browser?.close();
   if (server?.listening) {
     server.closeAllConnections();
-    await new Promise(resolve => server.close(resolve));
+    await new Promise<void>(resolve => server.close(() => resolve()));
   }
 });
-async function withPage(name, run) {
+async function withPage(name: string, run: (page: Page, context: BrowserContext) => Promise<void>) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   try {
     const page = await context.newPage();
@@ -61,8 +69,8 @@ test('snapshot policy drops scripts, custom styles, procedural rules, and consen
 
 test('every bundled cosmetic rule passes the action policy and snapshot hashes match', async () => {
   const directory = new URL('../resources/filters/', import.meta.url);
-  const manifest = JSON.parse(await readFile(new URL('manifest.json', directory), 'utf8'));
-  const hash = value => createHash('sha256').update(value).digest('hex');
+  const manifest: FilterManifest = JSON.parse(await readFile(new URL('manifest.json', directory), 'utf8'));
+  const hash = (value: Buffer | string) => createHash('sha256').update(value).digest('hex');
   for (const [name, source] of Object.entries(manifest.sources)) {
     const upstream = await readFile(new URL(`upstream/${name}.txt.gz`, directory));
     assert.equal(hash(upstream), source.sourceCompressedSha256);
@@ -76,6 +84,7 @@ test('every bundled cosmetic rule passes the action policy and snapshot hashes m
       assert.equal(selected.rule, line);
       if (selected.kind === 'cosmetic') {
         const filter = CosmeticFilter.parse(line);
+        assert.ok(filter);
         assert.equal(filter.isScriptInject() || filter.isExtended() || filter.hasCustomStyle(), false);
       }
     }
@@ -199,7 +208,7 @@ for (const name of ['login', 'age', 'main']) {
 
 test('ads have a separate opt-in network engine; cookie mode does not block requests', async () => {
   const ads = await loadBlocker({ ads: true });
-  assert.notEqual(ads.network, null);
+  assert.ok(ads.network);
   assert.equal(ads.network.config.loadCosmeticFilters, false);
   const request = Request.fromRawDetails({ url: 'https://example.com/ads/test.js', sourceUrl: origin, type: 'script' });
   assert.equal(typeof ads.network.match(request).match, 'boolean');
@@ -207,7 +216,7 @@ test('ads have a separate opt-in network engine; cookie mode does not block requ
 });
 
 test('live reference labels cover 17 reachable sites and three explicit exclusions', async () => {
-  const manifest = JSON.parse(await readFile(new URL('../benchmarks/regressions.json', import.meta.url), 'utf8'));
+  const manifest: { sites: { status: string; id: string; baseline: string; libraryExpectation: string }[] } = JSON.parse(await readFile(new URL('../benchmarks/regressions.json', import.meta.url), 'utf8'));
   assert.equal(manifest.sites.filter(site => site.status === 'reachable-reference').length, 17);
   assert.equal(manifest.sites.filter(site => site.status === 'excluded-access-restriction').length, 3);
   assert.equal(new Set(manifest.sites.map(site => site.id)).size, 20);

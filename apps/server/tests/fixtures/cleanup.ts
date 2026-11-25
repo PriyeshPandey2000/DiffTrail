@@ -1,3 +1,7 @@
+declare global {
+  interface Window { accepts: number; }
+}
+
 const banner = '<div id="cookie-banner" role="dialog"><p>Cookie preferences</p><button onclick="document.cookie=\'optional=yes\'; localStorage.setItem(\'optional\',\'yes\'); window.accepts++">Accept optional cookies</button></div>';
 const style = `<style>
 body { margin:0; background:white; } main { min-height:2200px; background:#cdf; }
@@ -6,11 +10,11 @@ body { margin:0; background:white; } main { min-height:2200px; background:#cdf; 
 </style>`;
 const setup = '<script>window.accepts=0; document.cookie="essential=yes"; localStorage.setItem("essential","yes");</script>';
 const content = '<main><h1>Keep this page content</h1><p>A deterministic fixture.</p></main>';
-const wrap = body => `<!doctype html><html><head><title>Cleanup fixture</title>${style}</head><body>${setup}${content}${body}</body></html>`;
+const wrap = (body: string) => `<!doctype html><html><head><title>Cleanup fixture</title>${style}</head><body>${setup}${content}${body}</body></html>`;
 
 // These selectors deliberately exercise existing upstream generic rules. They
 // are test data, not extra production rules or examples of broad CMP coverage.
-export const cases = {
+export const cases: Record<string, { html: string; expected: string }> = {
   banner: { html: wrap(banner), expected: 'hidden' },
   wrapper: { html: wrap('<div id="cookie-banner" style="position:static;height:0"><section role="dialog" style="position:fixed;bottom:0;width:100%;height:120px;background:red">Cookie preferences</section></div>'), expected: 'hidden-with-fixed-descendant' },
   delayed: { html: wrap(`<script>setTimeout(()=>document.body.insertAdjacentHTML('beforeend',${JSON.stringify(banner)}),3000)</script>`), expected: 'hidden-after-observation' },
@@ -26,7 +30,7 @@ export const cases = {
   none: { html: wrap(''), expected: 'preserved' },
 };
 
-export function iframeFixture(origin, crossOrigin = false) {
+export function iframeFixture(origin: string, crossOrigin = false) {
   const source = crossOrigin ? origin.replace('127.0.0.1', 'localhost') : origin;
   return wrap(`<iframe id="cookie-frame" src="${source}/banner" style="position:fixed;bottom:0;width:100%;height:160px;border:0;z-index:50"></iframe>`);
 }
