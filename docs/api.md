@@ -52,6 +52,11 @@ Pixel density is fixed at 2×, so the image is twice the viewport size: the defa
 
 Full-page captures are as wide as the viewport and at most 16,382 px tall (8,191 CSS px). Taller pages are cut off at that height, and the response says so with `X-DiffTrail-Truncated: true` and `output.truncated` in the metadata. The limit is the same for every format because WebP cannot encode more than 16,383 px on a side. DiffTrail does not scroll the page, so content that loads lazily below the fold may be missing from a full-page image.
 
+Two limits of full-page capture:
+
+- Cleanup and the residual check only inspect the first viewport. For a full-page capture, `X-DiffTrail-Residual` describes that first viewport, so an overlay lower on the page can remain even when it reports `none-detected`.
+- The page height is read from the document. Pages that scroll inside an inner container instead of the document are captured at one viewport tall and are not reported as truncated.
+
 ## Result headers
 
 Responses use the `Content-Type` of the requested format (`image/png`, `image/jpeg` or `image/webp`) and `Cache-Control: no-store`.

@@ -11,7 +11,7 @@ export const DEFAULT_FORMAT: OutputFormat = 'png';
 export const DEFAULT_QUALITY = 80;
 export const DEFAULT_VIEWPORT = Object.freeze({ width: 1920, height: 1080 });
 export const VIEWPORT_LIMITS = Object.freeze({ width: [200, 3840], height: [200, 4320] } as const);
-// Pixel density is fixed for now; a `scale` option is deferred (see docs/devlog.md).
+// Pixel density is fixed at 2x. A `scale` option may be added later.
 export const SCALE = 2;
 // One limit for every format: WebP cannot encode more than 16,383 px per side.
 export const MAX_IMAGE_DIMENSION = 16_383;

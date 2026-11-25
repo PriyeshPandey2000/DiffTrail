@@ -56,6 +56,22 @@ test('default capture uses the official runtime and reports unverifiable counts 
   } finally {await capture.close();}
 });
 
+test('the requested viewport reaches the official runtime', async () => {
+  let received: { width: number; height: number } | undefined;
+  const fakeContext = { close: async () => {}, newPage: async () => ({ setDefaultTimeout() {}, setDefaultNavigationTimeout() {}, goto: async () => null,
+    waitForTimeout: async () => {}, frames: () => [], evaluate: async () => 0, screenshot: async () => Buffer.from('fake') }) };
+  const capture = createCaptureService({ settleMs: 0, adguardFactory: async (categories, options) => {
+    received = options.viewport;
+    return { context: fakeContext, close: async () => {}, metadata: { engine: 'adguard-api-mv3', package: 'test', referenceVersion: 'test', rulesVersion: 'test', filters: [18, 19], rulesCount: 0, setupMs: 0 } };
+  } });
+  try {
+    await capture({ url: 'https://example.com', cleanup: 'standard', viewport: { width: 1280, height: 720 } });
+    assert.deepEqual(received, { width: 1280, height: 720 });
+    await capture({ url: 'https://example.com', cleanup: 'standard' });
+    assert.deepEqual(received, { width: 1920, height: 1080 });
+  } finally { await capture.close(); }
+});
+
 test('headless official runtime loads selected filters and hides an upstream banner without AI', {skip:!enabled}, async()=>{
   const worker=await createAdguardContext({cookies:true,popups:true});
   try{
