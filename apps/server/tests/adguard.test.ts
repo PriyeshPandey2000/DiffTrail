@@ -42,7 +42,7 @@ test('category mapping selects upstream filters, never custom rules', () => {
 test('default capture uses the official runtime and reports unverifiable counts as null', async () => {
   let calls=0, closes=0;
   const fakeContext={close:async()=>{},newPage:async()=>({setDefaultTimeout(){},setDefaultNavigationTimeout(){},goto:async()=>null,
-    waitForTimeout:async()=>{},frames:()=>[],screenshot:async()=>Buffer.from('fake')})};
+    waitForTimeout:async()=>{},frames:()=>[],evaluate:async()=>0,screenshot:async()=>Buffer.from('fake')})};
   const capture=createCaptureService({settleMs:0,adguardFactory:async categories=>{
     calls++;assert.equal(categories.cookies,true);
     return {context:fakeContext,close:async()=>{closes++},metadata:{engine:'adguard-api-mv3',package:'test',referenceVersion:'test',rulesVersion:'test',filters:[18,19],rulesCount:0,setupMs:0}};
@@ -54,6 +54,22 @@ test('default capture uses the official runtime and reports unverifiable counts 
     assert.equal(result.metadata.aiUsed,false);assert.equal(result.metadata.cookieRulesMayInteract,true);
     assert.equal(result.cleanup,'enabled');
   } finally {await capture.close();}
+});
+
+test('the requested viewport reaches the official runtime', async () => {
+  let received: { width: number; height: number } | undefined;
+  const fakeContext = { close: async () => {}, newPage: async () => ({ setDefaultTimeout() {}, setDefaultNavigationTimeout() {}, goto: async () => null,
+    waitForTimeout: async () => {}, frames: () => [], evaluate: async () => 0, screenshot: async () => Buffer.from('fake') }) };
+  const capture = createCaptureService({ settleMs: 0, adguardFactory: async (categories, options) => {
+    received = options.viewport;
+    return { context: fakeContext, close: async () => {}, metadata: { engine: 'adguard-api-mv3', package: 'test', referenceVersion: 'test', rulesVersion: 'test', filters: [18, 19], rulesCount: 0, setupMs: 0 } };
+  } });
+  try {
+    await capture({ url: 'https://example.com', cleanup: 'standard', viewport: { width: 1280, height: 720 } });
+    assert.deepEqual(received, { width: 1280, height: 720 });
+    await capture({ url: 'https://example.com', cleanup: 'standard' });
+    assert.deepEqual(received, { width: 1920, height: 1080 });
+  } finally { await capture.close(); }
 });
 
 test('headless official runtime loads selected filters and hides an upstream banner without AI', {skip:!enabled}, async()=>{
@@ -104,7 +120,7 @@ test('native cleanup loads from a checkout path containing spaces and Unicode', 
     await writeFile(resolve(project, 'package.json'), '{"type":"module"}');
     await symlink(fileURLToPath(new URL('../../../node_modules', import.meta.url)), resolve(project, 'node_modules'), 'dir');
     await symlink(fileURLToPath(new URL('../../../.cache/adguard-runtime/extension', import.meta.url)), resolve(cache, 'extension'), 'dir');
-    for (const name of ['adguard-context.ts', 'options.ts']) {
+    for (const name of ['adguard-context.ts', 'options.ts', 'output.ts']) {
       await copyFile(new URL(`../src/services/${name}`, import.meta.url), resolve(services, name));
     }
     const { createAdguardContext: createFromCheckout } = await import(pathToFileURL(resolve(services, 'adguard-context.ts')).href) as typeof import('../src/services/adguard-context.ts');

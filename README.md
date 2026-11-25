@@ -28,7 +28,7 @@ Open `screenshot.png` in your image viewer (`open screenshot.png` on macOS). Err
 
 ## Features
 
-- Capture URLs as 3840×2160 PNGs.
+- Capture URLs as PNG, JPEG, or WebP, at a chosen viewport size or as a full page.
 - Choose raw screenshots, cleanup presets, or individual filter categories.
 - Run headless or open a visible browser for debugging.
 - Inspect cleanup status, residual UI signals, and timings in response headers.
@@ -104,7 +104,7 @@ Use [the benchmark guide](docs/benchmarks.md) for manual comparison tooling. Liv
 
 ## Current scope
 
-DiffTrail currently supports viewport PNG screenshots. Full-page capture, other formats, consent-rejection automation, and AI cleanup are not implemented.
+DiffTrail supports viewport and full-page screenshots as PNG, JPEG, or WebP. Configurable loading delays and waits, caching, consent-rejection automation, and AI cleanup are not implemented.
 
 The server binds to loopback and is intended for local development. Public hosting still requires authentication, outbound network isolation, abuse controls, and resolution of the advisory in the [dependency review](docs/dependency-audit.md).
 
