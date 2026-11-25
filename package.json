@@ -1,11 +1,26 @@
 {
   "name": "web-capture",
   "version": "1.0.0",
-  "packageManager": "npm@11.6.4",
+  "packageManager": "npm@10.9.11",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "npm run start --workspace=server",
+    "dev": "npm run dev --workspace=server",
+    "test": "npm run test --workspace=server",
+    "filters:update": "node apps/server/scripts/update-filters.js",
+    "filters:rebuild": "node apps/server/scripts/update-filters.js --from-snapshot",
+    "setup:browser": "npm exec --workspace=server -- playwright install chromium",
+    "setup:benchmark": "npm run setup:browser && node apps/server/benchmarks/setup-extension.js",
+    "benchmark:overlays": "node apps/server/benchmarks/run.js",
+    "setup:blockers": "npm run setup:browser && node apps/server/benchmarks/setup-candidates.js",
+    "benchmark:compare": "node apps/server/benchmarks/compare.js",
+    "smoke:api": "node apps/server/benchmarks/api-smoke.js",
+    "setup:adguard": "npm run setup:browser && node apps/server/benchmarks/setup-adguard.js --runtime",
+    "build:adguard-reference": "node apps/server/benchmarks/build-adguard-api.js",
+    "benchmark:adguard": "node apps/server/benchmarks/adguard-headless.js",
+    "test:adguard": "RUN_ADGUARD_TESTS=1 npm test",
+    "audit:dependencies": "node apps/server/scripts/audit-dependencies.js"
   },
   "repository": {
     "type": "git",
@@ -21,5 +36,11 @@
   "homepage": "https://github.com/PriyeshPandey2000/Web-capture#readme",
   "devDependencies": {
     "turbo": "^2.7.1"
+  },
+  "workspaces": [
+    "apps/server"
+  ],
+  "overrides": {
+    "js-yaml": "3.15.2"
   }
 }

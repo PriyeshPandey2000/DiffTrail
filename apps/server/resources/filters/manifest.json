@@ -1,0 +1,81 @@
+{
+  "engine": "@ghostery/adblocker-playwright@2.20.3",
+  "policy": "cosmetic-only-v1; ads-network-opt-in",
+  "sources": {
+    "cookies": {
+      "url": "https://filters.adtidy.org/extension/chromium/filters/18.txt",
+      "title": "AdGuard Cookie Notices filter",
+      "version": "2.1.0.29",
+      "updated": "2026-11-24T06:13:18+00:00",
+      "license": "https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE",
+      "sourceSha256": "b982d3d87bd4b367c6ca8782589937000f6ea4dc20a2fb4d73ed5377a1d87c52",
+      "sourceCompressedSha256": "a06c43b3978536b9b8ef56b66ddef7754ce58ee8c8b3c6d30b48bf381b68da67",
+      "sha256": "573c49b42a159c671a888e6e89a2e95f6e3581aa86d2116dc8d7b1779421fa07",
+      "compressedSha256": "3684d64b59a7101220760f921271fb0c0f088b5708114e99494ab804b335a272",
+      "rules": 13037,
+      "inventory": {
+        "comment": 3151,
+        "cosmetic": 13037,
+        "network-disabled": 2906,
+        "script-or-extended-syntax": 6383
+      }
+    },
+    "popups": {
+      "url": "https://filters.adtidy.org/extension/chromium/filters/19.txt",
+      "title": "AdGuard Popups filter",
+      "version": "2.0.88.46",
+      "updated": "2026-11-24T06:13:20+00:00",
+      "license": "https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE",
+      "sourceSha256": "bdc47145aca54b0f39c8161ea78b5f11f5805805d88475bab1f69d6514ef7482",
+      "sourceCompressedSha256": "aec9a46270a2ac35b6e147cf3007b56d61eb428b0c332ff01b4ef89948b2d624",
+      "sha256": "856451a568181c9e9a2778d042bc20c46d4ff02c5a1c13f591bdd7ae2e7b0091",
+      "compressedSha256": "a7a34c55f77cf9561db43b5638fbfb697b20fb25d646639461319ec6589c5a3c",
+      "rules": 15221,
+      "inventory": {
+        "comment": 1318,
+        "network-disabled": 2242,
+        "script-or-extended-syntax": 5455,
+        "cosmetic": 15221
+      }
+    },
+    "chat": {
+      "url": "https://filters.adtidy.org/extension/chromium/filters/22.txt",
+      "title": "AdGuard Widgets filter",
+      "version": "2.0.15.66",
+      "updated": "2026-11-24T06:13:23+00:00",
+      "license": "https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE",
+      "sourceSha256": "3262f98bb423b34dea26178345531a1af9ff468ab167122e6c1a7e39839c8b3f",
+      "sourceCompressedSha256": "47ed17559dd1037afec548679cd9603eb641568ee2699fa55c36f0bd236174f4",
+      "sha256": "614d361a75e4922c2335366b2692433ff7ad06cfe657e976b860c012aad95d8f",
+      "compressedSha256": "88a0722535f16a7c56e65103f0889af394bc7c26f150264f407e695b00a6ea40",
+      "rules": 1687,
+      "inventory": {
+        "comment": 306,
+        "network-disabled": 858,
+        "cosmetic": 1687,
+        "script-or-extended-syntax": 198
+      }
+    },
+    "ads": {
+      "url": "https://filters.adtidy.org/extension/chromium/filters/2.txt",
+      "title": "AdGuard Base filter",
+      "version": "2.5.6.76",
+      "updated": "2026-11-24T09:09:03+00:00",
+      "license": "https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE",
+      "sourceSha256": "7938073124d2d1d69e6aba68a0904e3d12758b57e9112a672e27257ce4b84799",
+      "sourceCompressedSha256": "e9c5f0cab0af89a349f571c1364de1369b4a797987a20cd379f7e7d28be2d638",
+      "sha256": "d6163bcd0e2c845c84256295ed797d4ebff67bebd7c61207f03e989f855cb6d4",
+      "compressedSha256": "c8833b569b16c53373df27580f378a93cb7333ffcb08b7c4fa00a7b1f1bbaa16",
+      "rules": 121330,
+      "inventory": {
+        "comment": 16170,
+        "network": 73618,
+        "unsupported": 5030,
+        "network-modifier": 805,
+        "script-or-extended-syntax": 10018,
+        "cosmetic": 47712
+      }
+    }
+  },
+  "version": "033ab0afefcb131e"
+}

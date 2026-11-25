@@ -29,3 +29,13 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+
+# Local extension downloads and benchmark evidence
+.cache/
+artifacts/
+
+# Local curl captures saved at the repository root
+/*-headers.txt
+/screenshot*.png
+/posthog*.png
+/producthunt*.png

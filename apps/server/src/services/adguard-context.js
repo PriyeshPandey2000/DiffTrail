@@ -1,0 +1,83 @@
+import { chromium } from 'playwright';
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { CaptureError } from './options.js';
+
+export const filterCategories = Object.freeze({
+  cookies: [18], popups: [19], ads: [2], tracking: [3, 17, 25], social: [4],
+  widgets: [22], appBanners: [20], otherAnnoyances: [21],
+});
+export const selectFilters = categories => [...new Set(Object.entries(filterCategories)
+  .filter(([key]) => categories[key]).flatMap(([, ids]) => ids))].sort((a, b) => a - b);
+const directory = new URL('../../../../.cache/adguard-runtime/extension/', import.meta.url);
+const extensionPath = fileURLToPath(directory);
+const sha256 = data => createHash('sha256').update(data).digest('hex');
+let verified;
+async function loadBuild() {
+  if (!verified) {
+    verified = (async () => {
+      const build = JSON.parse(await readFile(new URL('build.json', directory), 'utf8'));
+      if (!build.lazyStart || !build.files || Object.keys(build.files).length < 3) throw new Error('Invalid AdGuard runtime build');
+      for (const [name, expected] of Object.entries(build.files)) {
+        if (sha256(await readFile(new URL(name, directory))) !== expected) throw new Error('AdGuard asset checksum mismatch');
+      }
+      return { ...build, rulesVersion: sha256(JSON.stringify(build.files)).slice(0, 16) };
+    })();
+    verified.catch(() => { verified = undefined; });
+  }
+  return verified;
+}
+
+// Fresh persistent profile per capture. Extension storage and website storage
+// never cross requests. No pool of previously visited profiles is maintained.
+export async function createAdguardContext(categories, { timeoutMs = 25_000, headless = true } = {}) {
+  const started = Date.now();
+  let build;
+  try { build = await loadBuild(); }
+  catch { throw new CaptureError('CLEANUP_UNAVAILABLE', 'Run npm run setup:adguard to build the verified AdGuard runtime.', 503); }
+  const profile = await mkdtemp(resolve(tmpdir(), 'difftrail-adguard-'));
+  let context, timer;
+  let closing;
+  const close = () => closing ||= (async () => {
+    try { await context?.close(); } finally { await rm(profile, { recursive: true, force: true }); }
+  })();
+  try {
+    const initialize = async () => {
+      context = await chromium.launchPersistentContext(profile, {
+        channel: 'chromium', headless, timeout: Math.min(10_000, timeoutMs),
+        viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, acceptDownloads: false,
+        args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+      });
+      const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: Math.max(1, timeoutMs - (Date.now() - started)) });
+      const id = new URL(worker.url()).host;
+      const control = await context.newPage();
+      await control.goto(`chrome-extension://${id}/status.html`);
+      const filters = selectFilters(categories);
+      const state = await control.evaluate(async filters => chrome.runtime.sendMessage({ type: 'difftrail:configure', filters }), filters);
+      if (!state?.ready || state.configuration?.rules?.length || !filters.every(filter => state.enabled.includes(`ruleset_${filter}`))
+        || state.enabled.some(name => !filters.includes(Number(name.replace('ruleset_', ''))))) {
+        throw new Error('AdGuard selected rulesets are not ready');
+      }
+      await control.close();
+      // Close launch pages before allowing the target navigation.
+      for (const page of context.pages()) await page.close();
+      return { context, close, metadata: { engine: 'adguard-api-mv3', package: build.package,
+        referenceVersion: build.referenceVersion, rulesVersion: build.rulesVersion, filters,
+        rulesCount: state.rulesCount, setupMs: Date.now() - started } };
+    };
+    const pending = initialize();
+    // If Chromium finishes launching after the setup deadline, close it too.
+    const closeLate = async () => { if (closing) { try { await context?.close(); } finally { await rm(profile, { recursive: true, force: true }); } } };
+    pending.then(closeLate, closeLate).catch(() => {});
+    return await Promise.race([pending, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new CaptureError('CAPTURE_TIMEOUT', 'AdGuard startup exceeded its time limit.', 504)), timeoutMs);
+    })]);
+  } catch (error) {
+    await close();
+    if (error instanceof CaptureError) throw error;
+    throw new CaptureError('CLEANUP_UNAVAILABLE', 'Unable to initialize AdGuard. Run npm run setup:adguard and retry.', 503);
+  } finally { clearTimeout(timer); }
+}

@@ -1,7 +1,21 @@
-import 'dotenv/config';
-// console.log(process.env)
-import {app} from './app.js'
+import { config } from 'dotenv';
+import { fileURLToPath } from 'node:url';
 
+config({ path: fileURLToPath(new URL('../../../.env', import.meta.url)), quiet: true });
 
+// Construct the capture service only after loading environment configuration.
+const { createApp } = await import('./app.js');
+const app = createApp();
 
-app.listen(3000,()=>console.log("listening on port 3000"));
+const port = Number(process.env.PORT || 3000);
+// Development server: public hosting needs network isolation and authentication.
+const server = app.listen(port, '127.0.0.1', () => console.log(`DiffTrail listening at http://127.0.0.1:${port}`));
+let stopping = false;
+async function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  server.close();
+  await app.locals.capture.close();
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
