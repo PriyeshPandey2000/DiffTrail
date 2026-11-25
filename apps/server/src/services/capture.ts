@@ -1,17 +1,18 @@
-import type { AdguardWorker, BrowserLauncher, CaptureBrowser, CaptureContext, CaptureMetadata, CaptureResult, CaptureService, CleanupCategories, Residual } from './types.ts';
+import type { AdguardWorker, BrowserLauncher, CaptureBrowser, CaptureContext, CaptureMetadata, CaptureResult, CaptureService, CleanupCategories, Residual, Viewport } from './types.ts';
 import type { Blocker } from './blocker.ts';
 
 import { chromium } from 'playwright';
 import { loadBlocker, applyCosmetics, inspectPage, attachNetworkBlocking } from './blocker.ts';
 import { createAdguardContext } from './adguard-context.ts';
 import { CaptureError, normalizeOptions } from './options.ts';
+import { OUTPUT_FORMATS, SCALE, renderImage } from './output.ts';
 export { CaptureError } from './options.ts';
 
 export interface CaptureServiceOptions {
   browserType?: BrowserLauncher;
   headless?: boolean;
   cleanupEngine?: 'adguard' | 'cosmetic';
-  adguardFactory?: (categories: CleanupCategories, options: { headless: boolean; timeoutMs: number }) => Promise<AdguardWorker>;
+  adguardFactory?: (categories: CleanupCategories, options: { headless: boolean; timeoutMs: number; viewport: Viewport }) => Promise<AdguardWorker>;
   blockerLoader?: typeof loadBlocker;
   maxConcurrent?: number;
   captureTimeout?: number;
@@ -92,14 +93,14 @@ export function createCaptureService({
       }
       ensureActive();
       if (requested && cleanupEngine === 'adguard') {
-        nativeWorker = await adguardFactory(options.cleanup, { headless, timeoutMs: Math.max(1, captureTimeout - (Date.now() - start)) });
+        nativeWorker = await adguardFactory(options.cleanup, { headless, timeoutMs: Math.max(1, captureTimeout - (Date.now() - start)), viewport: options.viewport });
         context = nativeWorker.context;
       } else {
         const instance = await getBrowser();
         ensureActive();
         uses++;
         context = await instance.newContext({
-          viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2,
+          viewport: options.viewport, deviceScaleFactor: SCALE,
           serviceWorkers: 'block', acceptDownloads: false,
         });
       }
@@ -152,7 +153,8 @@ export function createCaptureService({
           }
         }
         ensureActive();
-        const image = await page.screenshot({ type: 'png', timeout: 5000 });
+        // Full pages can take several seconds to encode; they may use the rest of the deadline.
+        const { image, output } = await renderImage(page, options, options.fullPage ? Math.max(1000, captureTimeout - (Date.now() - start)) : 5000);
         ensureActive();
         const applied = summary.hidden > 0 || counters.blockedRequests > 0;
         const incomplete = failed || summary.framesSkipped > 0 || summary.invalid > 0 || counters.networkErrors > 0;
@@ -167,9 +169,9 @@ export function createCaptureService({
             filtering: nativeWorker.metadata,
             cookieRulesMayInteract: Boolean(options.cleanup.cookies),
           } : {}),
-          elapsedMs: Date.now() - start,
+          output, elapsedMs: Date.now() - start,
         };
-        return { image, cleanup: status, metadata };
+        return { image, contentType: OUTPUT_FORMATS[output.format].contentType, cleanup: status, metadata };
       } finally { await closeContext(); }
     };
     try {

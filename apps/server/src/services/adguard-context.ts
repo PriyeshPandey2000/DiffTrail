@@ -1,5 +1,5 @@
 import type { BrowserContext } from 'playwright';
-import type { AdguardWorker, CleanupCategories, CleanupCategory } from './types.ts';
+import type { AdguardWorker, CleanupCategories, CleanupCategory, Viewport } from './types.ts';
 
 import { chromium } from 'playwright';
 import { createHash } from 'node:crypto';
@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CaptureError } from './options.ts';
+import { DEFAULT_VIEWPORT, SCALE } from './output.ts';
 
 interface RuntimeBuild {
   lazyStart: boolean;
@@ -49,7 +50,7 @@ async function loadBuild() {
 
 // Fresh persistent profile per capture. Extension storage and website storage
 // never cross requests. No pool of previously visited profiles is maintained.
-export async function createAdguardContext(categories: Partial<CleanupCategories>, { timeoutMs = 25_000, headless = true } = {}): Promise<AdguardWorker<BrowserContext>> {
+export async function createAdguardContext(categories: Partial<CleanupCategories>, { timeoutMs = 25_000, headless = true, viewport = DEFAULT_VIEWPORT }: { timeoutMs?: number; headless?: boolean; viewport?: Viewport } = {}): Promise<AdguardWorker<BrowserContext>> {
   const started = Date.now();
   let build;
   try { build = await loadBuild(); }
@@ -65,7 +66,7 @@ export async function createAdguardContext(categories: Partial<CleanupCategories
     const initialize = async (): Promise<AdguardWorker<BrowserContext>> => {
       context = await chromium.launchPersistentContext(profile, {
         channel: 'chromium', headless, timeout: Math.min(10_000, timeoutMs),
-        viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, acceptDownloads: false,
+        viewport, deviceScaleFactor: SCALE, acceptDownloads: false,
         args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
       });
       const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: Math.max(1, timeoutMs - (Date.now() - started)) });

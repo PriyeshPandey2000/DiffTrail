@@ -39,3 +39,6 @@ artifacts/
 /screenshot*.png
 /posthog*.png
 /producthunt*.png
+
+# Local working notes (not published)
+/docs/devlog.md

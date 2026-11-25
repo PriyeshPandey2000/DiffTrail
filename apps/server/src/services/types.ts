@@ -1,19 +1,39 @@
 import type { BrowserContext, BrowserContextOptions, LaunchOptions, Page } from 'playwright';
+import type { OutputFormat } from './output.ts';
 
 export type CleanupCategory = 'cookies' | 'popups' | 'ads' | 'tracking' | 'social'
   | 'widgets' | 'appBanners' | 'otherAnnoyances';
 export type CleanupCategories = Record<CleanupCategory, boolean>;
+export interface Viewport { width: number; height: number }
 export interface CaptureRequest {
   url: string;
   cleanup?: 'none' | 'standard' | 'all' | (Partial<CleanupCategories> & { chat?: false });
   consent?: 'none';
   ai?: false;
+  format?: OutputFormat | 'jpg';
+  quality?: number;
+  fullPage?: boolean;
+  viewport?: Partial<Viewport>;
 }
+// Fully resolved request. It is also a valid CaptureRequest, so normalizing it again is a no-op.
 export interface CaptureOptions {
   url: string;
   cleanup: CleanupCategories;
   consent: 'none';
   ai: false;
+  format: OutputFormat;
+  quality?: number;
+  fullPage: boolean;
+  viewport: Viewport;
+}
+export interface ImageOutput {
+  format: OutputFormat;
+  quality?: number;
+  fullPage: boolean;
+  viewport: Viewport;
+  // CSS px height of the page; only measured for full-page captures.
+  pageHeight?: number;
+  truncated: boolean;
 }
 export interface Residual {
   state: 'not-checked' | 'none-detected' | 'suspected' | 'unknown' | 'blocked';
@@ -21,7 +41,7 @@ export interface Residual {
 }
 
 // Only the browser operations used by captures are required of injected workers.
-export type CapturePage = Pick<Page, 'frames' | 'goto' | 'screenshot' | 'waitForTimeout'
+export type CapturePage = Pick<Page, 'frames' | 'goto' | 'screenshot' | 'evaluate' | 'waitForTimeout'
   | 'setDefaultTimeout' | 'setDefaultNavigationTimeout'>;
 export interface CaptureContext {
   newPage(): Promise<CapturePage>;
@@ -69,10 +89,12 @@ export interface CaptureMetadata {
   aiUsed: false;
   filtering?: AdguardMetadata;
   cookieRulesMayInteract?: boolean;
+  output: ImageOutput;
   elapsedMs: number;
 }
 export interface CaptureResult {
   image: Buffer;
+  contentType: string;
   cleanup: CleanupStatus;
   metadata: CaptureMetadata;
 }
