@@ -42,7 +42,7 @@ test('category mapping selects upstream filters, never custom rules', () => {
 test('default capture uses the official runtime and reports unverifiable counts as null', async () => {
   let calls=0, closes=0;
   const fakeContext={close:async()=>{},newPage:async()=>({setDefaultTimeout(){},setDefaultNavigationTimeout(){},goto:async()=>null,
-    waitForSelector:async()=>null,waitForTimeout:async()=>{},frames:()=>[],evaluate:async()=>0,screenshot:async()=>Buffer.from('fake')})};
+    locator:()=>{throw new Error('Unexpected target lookup')},waitForSelector:async()=>null,waitForTimeout:async()=>{},frames:()=>[],evaluate:async()=>0,screenshot:async()=>Buffer.from('fake')})};
   const capture=createCaptureService({settleMs:0,adguardFactory:async categories=>{
     calls++;assert.equal(categories.cookies,true);
     return {context:fakeContext,close:async()=>{closes++},metadata:{engine:'adguard-api-mv3',package:'test',referenceVersion:'test',rulesVersion:'test',filters:[18,19],rulesCount:0,setupMs:0}};
@@ -60,7 +60,7 @@ test('the requested viewport and density reach the official runtime', async () =
   let received: { width: number; height: number } | undefined;
   const scales: number[] = [];
   const fakeContext = { close: async () => {}, newPage: async () => ({ setDefaultTimeout() {}, setDefaultNavigationTimeout() {}, goto: async () => null,
-    waitForSelector: async () => null, waitForTimeout: async () => {}, frames: () => [], evaluate: async () => 0, screenshot: async () => Buffer.from('fake') }) };
+    locator: () => { throw new Error('Unexpected target lookup'); }, waitForSelector: async () => null, waitForTimeout: async () => {}, frames: () => [], evaluate: async () => 0, screenshot: async () => Buffer.from('fake') }) };
   const capture = createCaptureService({ settleMs: 0, adguardFactory: async (categories, options) => {
     received = options.viewport;
     scales.push(options.scale);

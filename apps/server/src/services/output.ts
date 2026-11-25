@@ -19,7 +19,7 @@ export const MAX_FULL_PAGE_HEIGHT = Math.floor(MAX_IMAGE_DIMENSION / SCALE);
 
 export const MAX_OUTPUT_PIXELS = VIEWPORT_LIMITS.width[1] * SCALE * MAX_FULL_PAGE_HEIGHT * SCALE;
 // Measured JPEG encoder boundary in the bundled Chromium, below the format's nominal limit.
-const MAX_FORMAT_SIDE = { png: Infinity, jpeg: 65_500, webp: MAX_IMAGE_DIMENSION };
+export const MAX_FORMAT_SIDE = { png: Infinity, jpeg: 65_500, webp: MAX_IMAGE_DIMENSION };
 type RenderOptions = Pick<CaptureOptions, 'format' | 'quality' | 'fullPage' | 'viewport' | 'scale' | 'maxHeight'>;
 
 export function captureHeightLimit({ format, viewport, scale, maxHeight }: RenderOptions) {

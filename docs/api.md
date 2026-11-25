@@ -62,8 +62,41 @@ Full-page requests scroll by default to trigger lazy-loaded content, stopping on
 
 Two limits of full-page capture:
 
-- Cleanup and the residual check only inspect the first viewport. For a full-page capture, `X-DiffTrail-Residual` describes that first viewport, so an overlay lower on the page can remain even when it reports `none-detected`.
+- Cleanup residual checks only inspect the initial capture viewport (the first viewport for full-page mode). For a full-page capture, `X-DiffTrail-Residual` describes that first viewport, so an overlay lower on the page can remain even when it reports `none-detected`.
 - The page height is read from the document. Pages that scroll inside an inner container instead of the document are captured at one viewport tall and are not reported as truncated.
+
+## Element and rectangle capture
+
+Use `selector` to capture the **first matching element in DOM order**, including elements in open shadow roots. This is separate from `waitForSelector`, which only controls readiness and does not select the output area.
+
+```sh
+curl --fail-with-body http://127.0.0.1:3000/api/screenshot \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com","selector":"h1","cleanup":"standard"}' \
+  --output heading.png
+```
+
+`selector` accepts non-empty CSS of at most 1,000 characters. Both browser CSS and Playwright parser validation run before navigation; unsupported syntax returns 400. XPath, Playwright selector engines, frame traversal, and closed shadow roots are not supported. Get a CSS selector from your page source or browser DevTools. If the first match is hidden, a later visible match is not substituted.
+
+DiffTrail waits up to five seconds for that first match to become visible and stable enough to scroll into view, including scrolling nested containers. The total request deadline still applies. It then runs the requested cleanup and bounded image-readiness check. Final bounds are resolved again before capture, with another target wait of at most five seconds. A missing/hidden/unstable target returns `422 TARGET_NOT_VISIBLE` when this target wait expires; the overall request deadline still returns 504. There is no fallback to a viewport image.
+
+To capture a rectangle, supply all four `clip` fields:
+
+```json
+{"url":"https://example.com","clip":{"x":100,"y":200,"width":600,"height":400}}
+```
+
+Coordinates are **CSS pixels from the document's top-left**, not output-image pixels or coordinates relative to the current viewport. `x` and `y` must be integers from 0–100,000; `width` and `height` must be integers from 1–100,000. DiffTrail scrolls the document toward the rectangle to trigger nearby lazy content, then captures the exact region. It does not traverse all content inside a tall rectangle or nested scroll containers. At the default `scale:2`, a 600×400 CSS rectangle produces a 1200×800 image; `scale:1` produces 600×400.
+
+Rules for both modes:
+
+- `selector`, `clip`, and `fullPage:true` are mutually exclusive. Conflicts and malformed options return 400. `maxHeight` remains full-page-only.
+- Existing format, quality, viewport, density, loading controls, and cleanup options remain available. Omit both target options for the existing viewport/full-page behavior.
+- Cleanup runs before final target measurement. It can change layout, hide, or remove the requested target; a target absent or hidden at measurement returns `422 TARGET_NOT_VISIBLE` without another wait for it to appear.
+- A region extending outside the document returns `422 TARGET_OUT_OF_BOUNDS`. Format-side and output-pixel limits apply to both dimensions; oversized targets return `422 TARGET_TOO_LARGE` rather than being silently truncated or downscaled.
+- The response remains image bytes. `output.target` in `X-DiffTrail-Metadata` records `mode` (`selector` or `clip`) and measured document-relative CSS `bounds`. The selector string is not echoed into headers. `output.fullPage` and `output.truncated` are false for targeted output.
+
+Element screenshots crop what the browser renders: overlapping UI can still cover a target, a scrollable element includes only its currently visible internal content, and targeting does not bypass access challenges. CSS backgrounds, canvas, iframe content, and images in shadow roots are outside the main-document image-readiness check. Rapid layout changes can still affect the screenshot after bounds are measured. Cleanup residual metadata describes the viewport inspected after initial target scrolling, not a guarantee about every pixel of a large target.
 
 ## Loading controls
 

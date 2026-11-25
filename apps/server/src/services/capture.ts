@@ -7,6 +7,7 @@ import { createAdguardContext } from './adguard-context.ts';
 import { CaptureError, normalizeOptions } from './options.ts';
 import { preparePage, waitForImages } from './loading.ts';
 import { OUTPUT_FORMATS, renderImage } from './output.ts';
+import { validateSelectors, prepareTarget, targetBounds, renderTarget } from './target.ts';
 export { CaptureError } from './options.ts';
 
 export interface CaptureServiceOptions {
@@ -114,6 +115,7 @@ export function createCaptureService({
         const page = await context.newPage();
         page.setDefaultTimeout(5000);
         page.setDefaultNavigationTimeout(Math.min(15_000, requestTimeout));
+        await validateSelectors(page, options);
         const response = await page.goto(options.url, { waitUntil: options.waitUntil });
         if (response && response.status() >= 400) {
           const upstreamStatus = response.status();
@@ -123,6 +125,7 @@ export function createCaptureService({
         }
         const loading = await preparePage(page, options, requestTimeout);
         ensureActive();
+        await prepareTarget(page, options, Math.min(5000, Math.max(1, requestTimeout - (Date.now() - start))));
         const summary = { hidden: 0, guarded: 0, invalid: 0, framesSkipped: 0 };
         let residual: Residual = { state: 'not-checked', signals: [] };
         let failed = false, transientFrameErrors = 0;
@@ -157,10 +160,12 @@ export function createCaptureService({
           }
         }
         ensureActive();
-        loading.images = await waitForImages(page, options, Math.min(1500, Math.max(0, requestTimeout - (Date.now() - start))));
+        const region = await targetBounds(page, options);
+        loading.images = await waitForImages(page, options, Math.min(1500, Math.max(0, requestTimeout - (Date.now() - start))), region);
         ensureActive();
         // Full pages can take several seconds to encode; they may use the rest of the deadline.
-        const { image, output } = await renderImage(page, options, options.fullPage ? Math.max(1000, requestTimeout - (Date.now() - start)) : 5000);
+        const render = options.selector !== undefined || options.clip ? renderTarget : renderImage;
+        const { image, output } = await render(page, options, Math.max(1, requestTimeout - (Date.now() - start)));
         ensureActive();
         const applied = summary.hidden > 0 || counters.blockedRequests > 0;
         const incomplete = failed || summary.framesSkipped > 0 || summary.invalid > 0 || counters.networkErrors > 0;
