@@ -1,5 +1,5 @@
-import type { BrowserContext } from 'playwright';
-import type { AdguardWorker, CleanupCategories, CleanupCategory, Viewport } from './types.ts';
+import type { BrowserContext, BrowserContextOptions } from 'playwright';
+import type { AdguardWorker, CleanupCategories, CleanupCategory } from './types.ts';
 
 import { chromium } from 'playwright';
 import { createHash } from 'node:crypto';
@@ -50,7 +50,7 @@ async function loadBuild() {
 
 // Fresh persistent profile per capture. Extension storage and website storage
 // never cross requests. No pool of previously visited profiles is maintained.
-export async function createAdguardContext(categories: Partial<CleanupCategories>, { timeoutMs = 25_000, headless = true, viewport = DEFAULT_VIEWPORT, scale = SCALE }: { timeoutMs?: number; headless?: boolean; viewport?: Viewport; scale?: 1 | 2 } = {}): Promise<AdguardWorker<BrowserContext>> {
+export async function createAdguardContext(categories: Partial<CleanupCategories>, { timeoutMs = 25_000, headless = true, contextOptions = { viewport: { ...DEFAULT_VIEWPORT }, deviceScaleFactor: SCALE } }: { timeoutMs?: number; headless?: boolean; contextOptions?: BrowserContextOptions } = {}): Promise<AdguardWorker<BrowserContext>> {
   const started = Date.now();
   let build;
   try { build = await loadBuild(); }
@@ -65,8 +65,7 @@ export async function createAdguardContext(categories: Partial<CleanupCategories
   try {
     const initialize = async (): Promise<AdguardWorker<BrowserContext>> => {
       context = await chromium.launchPersistentContext(profile, {
-        channel: 'chromium', headless, timeout: Math.min(10_000, timeoutMs),
-        viewport, deviceScaleFactor: scale, acceptDownloads: false,
+        ...contextOptions, channel: 'chromium', headless, timeout: Math.min(10_000, timeoutMs), acceptDownloads: false,
         args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
       });
       const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: Math.max(1, timeoutMs - (Date.now() - started)) });

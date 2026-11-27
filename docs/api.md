@@ -42,7 +42,7 @@ All options are optional. Defaults reproduce the original behavior: a 1920×1080
 | `format` | `"png"`, `"jpeg"` (alias `"jpg"`), `"webp"` | `"png"` | Sets the response `Content-Type`. |
 | `quality` | integer 1–100 | `80` | JPEG and WebP only. Sending it with PNG is rejected. |
 | `viewport` | `{"width": 200–3840, "height": 200–4320}` | `1920` × `1080` | Either field may be omitted. |
-| `scale` | `1` or `2` | `2` | Output pixel density; preserves the CSS viewport layout. |
+| `scale` | number from 1 to 5 | `2`, or the device preset's density | Output pixel density; preserves the CSS viewport layout. Fractional values such as `2.75` are allowed. |
 | `maxHeight` | integer 1–100,000 CSS px | omitted | Requires `fullPage:true`; caps the capture height. |
 | `fullPage` | `true` or `false` | `false` | Captures the whole page height, up to the limit below. |
 
@@ -52,11 +52,13 @@ All options are optional. Defaults reproduce the original behavior: a 1920×1080
 
 Pixel density defaults to **2×**: the default output is 3840×2160. Explicit `scale:1` produces one image pixel per CSS pixel and reduces image size and rendering work.
 
+The image must fit the format and the pixel budget below. For viewport captures, `viewport.width × scale` by `viewport.height × scale` must fit; for full-page captures, only the width must fit, and the height is truncated as described below. A request that cannot fit returns 400 rather than a reduced image. For example, the largest viewport (3840×4320) works at `scale:2` but not at `scale:3`.
+
 Full-page captures are bounded by the smallest of the requested `maxHeight`, the format limit, and the server's output-pixel budget. WebP supports at most 16,383 device pixels per side; JPEG is capped at the bundled Chromium encoder's measured 65,500-pixel boundary. PNG uses the pixel budget rather than inheriting WebP's height limit.
 
-The pixel budget is **125,813,760 output pixels**, retaining the former largest allowed image area. At density `scale`, the budget bounds CSS height to `floor(budget / (viewport.width × scale²))`. This is an output-area bound, not a guaranteed RAM allowance; deployment memory and concurrency still require measurement. No format, density, or page layout is silently changed to fit.
+The pixel budget is **125,813,760 output pixels**, retaining the former largest allowed image area. At density `scale`, the budget bounds CSS height to `floor(budget / (width × scale²))`, where `width` is the captured CSS width (normally `viewport.width`). This is an output-area bound, not a guaranteed RAM allowance; deployment memory and concurrency still require measurement. No format, density, or page layout is silently changed to fit.
 
-When limited, the response includes `X-DiffTrail-Truncated: true`, `output.truncated`, and `output.truncationReasons` (`max-height`, `format-limit`, or `pixel-budget`). An explicit maxHeight can crop below the viewport height. Otherwise a short full-page capture is at least one viewport tall.
+When limited, the response includes `X-DiffTrail-Truncated: true`, `output.truncated`, and `output.truncationReasons` (`max-height`, `format-limit`, or `pixel-budget`). A short full-page capture is one viewport tall unless `maxHeight`, the format limit, or the pixel budget is smaller. At high density the pixel budget alone can make it shorter than the viewport: a 3840 px wide viewport at `scale:5` allows 1,310 CSS px.
 
 Full-page requests scroll by default to trigger lazy-loaded content, stopping once the capturable region is reached or the step limit is exhausted. Use `scroll:false` to opt out. Viewport requests do not scroll unless explicitly requested.
 
@@ -126,6 +128,34 @@ After cleanup and before capture, DiffTrail waits up to 1,500 ms for relevant ma
 
 `loading.images` reports `state` (`ready`, `incomplete`, or `unknown`), loaded/failed/pending/untriggered counts, and elapsed time. Inspection is limited to 10,000 main-document images. This is not a guarantee for CSS backgrounds, iframe/shadow images, videos, or canvas content. Missing images do not turn an otherwise successful capture into an error. There is no additional fixed delay when relevant images are already ready.
 
+## Device and browser emulation
+
+These options change how the browser presents itself to the page. All are optional. **Options that are not sent are not passed to the browser**, so it keeps its own defaults: a desktop Chromium user agent, and the locale and time zone of the machine running DiffTrail.
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `device` | preset id, such as `"iphone_15"` or `"ipad_pro_11_landscape"` | Sets the viewport, pixel density, mobile layout, touch support, and user agent of the device. |
+| `colorScheme` | `"light"` or `"dark"` | Sets `prefers-color-scheme`. Only pages that support dark mode change. |
+| `reducedMotion` | `true` or `false` | Sets `prefers-reduced-motion: reduce`. It does not pause animations the page runs regardless. |
+| `media` | `"screen"` or `"print"` | `"print"` renders the page with its print styles. |
+| `userAgent` | 1–512 printable ASCII characters | Overrides the browser's user agent, including a device preset's. |
+| `locale` | language tag, such as `"de-DE"` | Sets `navigator.language` and the `Accept-Language` header. |
+| `timezone` | IANA time zone, such as `"Europe/Berlin"` or `"UTC"` | Sets the time zone the page sees. |
+
+```json
+{"url":"https://example.com","device":"iphone_15","colorScheme":"dark","locale":"de-DE","timezone":"Europe/Berlin"}
+```
+
+Presets: `iphone_se`, `iphone_13`, `iphone_14_pro_max`, `iphone_15`, `iphone_15_pro_max`, `iphone_16`, `iphone_16_plus`, `pixel_5`, `galaxy_s8`, `galaxy_s9+`, `ipad_mini`, `ipad_pro_11`, and `galaxy_tab_s4`. Each also has a `_landscape` variant. `GET /api/devices` returns every preset with its viewport, density, and user agent. Device sizes and user agents come from the bundled Playwright and can change when it is upgraded.
+
+Explicit options override the preset: `viewport` (either field), `scale`, and `userAgent`. Presets capture at their native density, such as `galaxy_s9+` at 4.5×.
+
+On a mobile preset, pages without a mobile viewport tag, or with content wider than the device, are laid out wider (often 980 CSS px) and zoomed out, as on a phone. A viewport capture shows that zoomed-out view. A full-page capture covers the same width at the requested density, so the image is wider than `viewport.width × scale`; `output.captureWidth` reports the captured CSS width when it differs from the viewport.
+
+This is emulation in Chromium, not a real device. iPhone and iPad presets send a Safari user agent but still render with Chromium. Higher density makes larger images and reduces the full-page height that fits in the format and pixel limits.
+
+The metadata header includes `emulation`: the preset, native `deviceScale`, `mobile`, `touch`, the user agent sent, `locale`, `timezone`, `colorScheme`, `reducedMotion`, and `media`. A `null` value means the browser default was used.
+
 ## Result headers
 
 Responses use the `Content-Type` of the requested format (`image/png`, `image/jpeg` or `image/webp`) and `Cache-Control: no-store`.
@@ -134,7 +164,7 @@ Responses use the `Content-Type` of the requested format (`image/png`, `image/jp
 - `X-DiffTrail-Residual`: `not-checked` in raw mode; otherwise `none-detected`, `suspected`, `unknown` or `blocked`.
 - `X-DiffTrail-Rules-Version`: the verified local build fingerprint, or `none`.
 - `X-DiffTrail-Truncated`: `true`, present only when a full-page capture was cut at the height limit.
-- `X-DiffTrail-Metadata`: JSON containing the image `output` (format, quality, scale, maxHeight, viewport, `fullPage`, `truncated`, truncation reasons, and the measured `pageHeight` for full-page captures), the engine, categories, filter IDs, SDK/reference versions, setup/capture times, residual signals, consent behavior and `aiUsed`.
+- `X-DiffTrail-Metadata`: JSON containing the image `output` (format, quality, scale, maxHeight, viewport, `fullPage`, `truncated`, truncation reasons, and the measured `pageHeight` for full-page captures), the engine, categories, filter IDs, SDK/reference versions, setup/capture times, residual signals, consent behavior, `aiUsed`, `loading`, and `emulation`.
 
 `enabled` does not mean every banner was removed. The official SDK does not supply a verified count of hidden elements; `hidden`, `guarded` and `blockedRequests` are `null` rather than invented counts. Residual detection is read-only, bounded and heuristic. Legitimate dialogs can be flagged. No detector output guarantees a clear page.
 

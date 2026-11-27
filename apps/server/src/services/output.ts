@@ -1,4 +1,4 @@
-import type { CapturePage, CaptureOptions, ImageOutput } from './types.ts';
+import type { CapturePage, CaptureOptions, ImageOutput, Viewport } from './types.ts';
 
 export const OUTPUT_FORMATS = {
   png: { contentType: 'image/png', lossy: false },
@@ -31,7 +31,17 @@ export function captureHeightLimit({ format, viewport, scale, maxHeight }: Rende
   return { height: Math.min(...limits.map(limit => limit.height)), limits };
 }
 
-// Full-page output is clipped to viewport width and the smallest applicable bound.
+// Mobile emulation zooms out pages that are wider than the device viewport. A viewport
+// screenshot then shows the visual viewport, which is wider and taller in document CSS px.
+// Without zoom (desktop, or a page that fits) this is the configured viewport.
+export async function visibleViewport(page: CapturePage, viewport: Viewport): Promise<Viewport> {
+  const visual = await page.evaluate(() => window.visualViewport && window.visualViewport.scale < 0.999
+    ? { width: window.visualViewport.width, height: window.visualViewport.height } : null);
+  if (!visual || typeof visual !== 'object') return viewport;
+  return { width: Math.max(viewport.width, Math.ceil(visual.width)), height: Math.max(viewport.height, Math.ceil(visual.height)) };
+}
+
+// Full-page output is clipped to the visible width and the smallest applicable bound.
 // Optional scrolling is handled by the loading stage; rendering reports any cutoff.
 export async function renderImage(page: CapturePage, options: RenderOptions, timeout: number): Promise<{ image: Buffer; output: ImageOutput }> {
   const { format, quality, fullPage, viewport, scale, maxHeight } = options;
@@ -40,11 +50,15 @@ export async function renderImage(page: CapturePage, options: RenderOptions, tim
     ...(maxHeight === undefined ? {} : { maxHeight }), fullPage, viewport, truncated: false };
   if (!fullPage) return { image: await page.screenshot(base), output };
   const pageHeight = await page.evaluate(() => Math.ceil(Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0)));
-  const naturalHeight = Math.max(viewport.height, pageHeight);
-  const { height: limit, limits } = captureHeightLimit(options);
+  const visible = await visibleViewport(page, viewport);
+  // A zoomed-out mobile layout can be wider than the format allows at this density.
+  const width = Math.min(visible.width, Math.floor(MAX_FORMAT_SIDE[format] / scale));
+  const naturalHeight = Math.max(visible.height, pageHeight);
+  const { height: limit, limits } = captureHeightLimit({ ...options, viewport: { width, height: visible.height } });
   const height = Math.min(naturalHeight, limit);
-  const image = await page.screenshot({ ...base, fullPage: true, clip: { x: 0, y: 0, width: viewport.width, height } });
-  const truncated = naturalHeight > height;
-  return { image, output: { ...output, pageHeight, truncated,
-    ...(truncated ? { truncationReasons: limits.filter(item => item.height === height).map(item => item.reason) } : {}) } };
+  const image = await page.screenshot({ ...base, fullPage: true, clip: { x: 0, y: 0, width, height } });
+  const reasons = [...(naturalHeight > height ? limits.filter(item => item.height === height).map(item => item.reason) : []),
+    ...(width < visible.width ? ['format-limit' as const] : [])];
+  return { image, output: { ...output, pageHeight, ...(width === viewport.width ? {} : { captureWidth: width }), truncated: reasons.length > 0,
+    ...(reasons.length ? { truncationReasons: [...new Set(reasons)] } : {}) } };
 }

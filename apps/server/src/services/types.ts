@@ -7,6 +7,29 @@ export type CleanupCategories = Record<CleanupCategory, boolean>;
 export interface Viewport { width: number; height: number }
 export interface Clip { x: number; y: number; width: number; height: number }
 export type WaitUntil = 'load' | 'domcontentloaded' | 'networkidle';
+export type ColorScheme = 'light' | 'dark';
+export type MediaType = 'screen' | 'print';
+export interface EmulationRequest {
+  device?: string;
+  userAgent?: string;
+  locale?: string;
+  timezone?: string;
+  colorScheme?: ColorScheme;
+  reducedMotion?: boolean;
+  media?: MediaType;
+}
+export interface EmulationMetadata {
+  device: string | null;
+  deviceScale?: number;
+  mobile: boolean;
+  touch: boolean;
+  userAgent: string | null;
+  locale: string | null;
+  timezone: string | null;
+  colorScheme: ColorScheme | null;
+  reducedMotion: boolean;
+  media: MediaType;
+}
 export interface ScrollOptions { step?: number; delay?: number; maxSteps?: number }
 export interface ResolvedScroll { step: number; delay: number; maxSteps: number }
 export interface ImageReadiness {
@@ -25,7 +48,7 @@ export interface LoadingMetadata {
   selector: 'not-requested' | 'matched';
   scroll: { status: 'not-requested' | 'completed' | 'limited' | 'blocked'; steps: number };
 }
-export interface CaptureRequest {
+export interface CaptureRequest extends EmulationRequest {
   selector?: string;
   clip?: Clip;
   waitUntil?: WaitUntil;
@@ -39,13 +62,20 @@ export interface CaptureRequest {
   ai?: false;
   format?: OutputFormat | 'jpg';
   quality?: number;
-  scale?: 1 | 2;
+  scale?: number;
   maxHeight?: number;
   fullPage?: boolean;
   viewport?: Partial<Viewport>;
 }
 // Fully resolved request. It is also a valid CaptureRequest, so normalizing it again is a no-op.
 export interface CaptureOptions {
+  device?: string;
+  userAgent?: string;
+  locale?: string;
+  timezone?: string;
+  colorScheme?: ColorScheme;
+  reducedMotion?: true;
+  media?: MediaType;
   selector?: string;
   clip?: Clip;
   waitUntil: WaitUntil;
@@ -59,7 +89,7 @@ export interface CaptureOptions {
   ai: false;
   format: OutputFormat;
   quality?: number;
-  scale: 1 | 2;
+  scale: number;
   maxHeight?: number;
   fullPage: boolean;
   viewport: Viewport;
@@ -68,12 +98,14 @@ export interface ImageOutput {
   target?: { mode: 'selector' | 'clip'; bounds: Clip };
   format: OutputFormat;
   quality?: number;
-  scale: 1 | 2;
+  scale: number;
   maxHeight?: number;
   fullPage: boolean;
   viewport: Viewport;
   // CSS px height of the page; only measured for full-page captures.
   pageHeight?: number;
+  // CSS px width of a full-page capture when it differs from viewport.width (zoomed-out mobile layout).
+  captureWidth?: number;
   truncated: boolean;
   truncationReasons?: ('max-height' | 'format-limit' | 'pixel-budget')[];
 }
@@ -84,7 +116,7 @@ export interface Residual {
 
 // Only the browser operations used by captures are required of injected workers.
 export type CapturePage = Pick<Page, 'frames' | 'goto' | 'screenshot' | 'evaluate' | 'waitForTimeout' | 'locator'
-  | 'setDefaultTimeout' | 'setDefaultNavigationTimeout'> & {
+  | 'setDefaultTimeout' | 'setDefaultNavigationTimeout'> & Partial<Pick<Page, 'emulateMedia'>> & {
   waitForSelector(selector: string, options: { state: 'visible'; timeout: number }): Promise<unknown>;
 };
 export interface CaptureContext {
@@ -135,6 +167,7 @@ export interface CaptureMetadata {
   cookieRulesMayInteract?: boolean;
   output: ImageOutput;
   loading: LoadingMetadata;
+  emulation: EmulationMetadata;
   elapsedMs: number;
 }
 export interface CaptureResult {

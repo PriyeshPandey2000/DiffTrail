@@ -1,4 +1,5 @@
-import type { AdguardWorker, BrowserLauncher, CaptureBrowser, CaptureContext, CaptureMetadata, CaptureResult, CaptureService, CleanupCategories, Residual, Viewport } from './types.ts';
+import type { BrowserContextOptions } from 'playwright';
+import type { AdguardWorker, BrowserLauncher, CaptureBrowser, CaptureContext, CaptureMetadata, CaptureResult, CaptureService, CleanupCategories, Residual } from './types.ts';
 import type { Blocker } from './blocker.ts';
 
 import { chromium } from 'playwright';
@@ -7,6 +8,7 @@ import { createAdguardContext } from './adguard-context.ts';
 import { CaptureError, normalizeOptions } from './options.ts';
 import { preparePage, waitForImages } from './loading.ts';
 import { OUTPUT_FORMATS, renderImage } from './output.ts';
+import { contextOptions, emulatePage, emulationMetadata } from './emulation.ts';
 import { validateSelectors, prepareTarget, targetBounds, renderTarget } from './target.ts';
 export { CaptureError } from './options.ts';
 
@@ -14,7 +16,7 @@ export interface CaptureServiceOptions {
   browserType?: BrowserLauncher;
   headless?: boolean;
   cleanupEngine?: 'adguard' | 'cosmetic';
-  adguardFactory?: (categories: CleanupCategories, options: { headless: boolean; timeoutMs: number; viewport: Viewport; scale: 1 | 2 }) => Promise<AdguardWorker>;
+  adguardFactory?: (categories: CleanupCategories, options: { headless: boolean; timeoutMs: number; contextOptions: BrowserContextOptions }) => Promise<AdguardWorker>;
   blockerLoader?: typeof loadBlocker;
   maxConcurrent?: number;
   captureTimeout?: number;
@@ -96,16 +98,13 @@ export function createCaptureService({
       }
       ensureActive();
       if (requested && cleanupEngine === 'adguard') {
-        nativeWorker = await adguardFactory(options.cleanup, { headless, timeoutMs: Math.max(1, requestTimeout - (Date.now() - start)), viewport: options.viewport, scale: options.scale });
+        nativeWorker = await adguardFactory(options.cleanup, { headless, timeoutMs: Math.max(1, requestTimeout - (Date.now() - start)), contextOptions: contextOptions(options) });
         context = nativeWorker.context;
       } else {
         const instance = await getBrowser();
         ensureActive();
         uses++;
-        context = await instance.newContext({
-          viewport: options.viewport, deviceScaleFactor: options.scale,
-          serviceWorkers: 'block', acceptDownloads: false,
-        });
+        context = await instance.newContext({ ...contextOptions(options), serviceWorkers: 'block', acceptDownloads: false });
       }
       openContexts.add(closeContext);
       try {
@@ -115,6 +114,7 @@ export function createCaptureService({
         const page = await context.newPage();
         page.setDefaultTimeout(5000);
         page.setDefaultNavigationTimeout(Math.min(15_000, requestTimeout));
+        await emulatePage(page, options);
         await validateSelectors(page, options);
         const response = await page.goto(options.url, { waitUntil: options.waitUntil });
         if (response && response.status() >= 400) {
@@ -180,7 +180,7 @@ export function createCaptureService({
             filtering: nativeWorker.metadata,
             cookieRulesMayInteract: Boolean(options.cleanup.cookies),
           } : {}),
-          output, loading, elapsedMs: Date.now() - start,
+          output, loading, emulation: emulationMetadata(options), elapsedMs: Date.now() - start,
         };
         return { image, contentType: OUTPUT_FORMATS[output.format].contentType, cleanup: status, metadata };
       } finally { await closeContext(); }

@@ -56,14 +56,16 @@ test('default capture uses the official runtime and reports unverifiable counts 
   } finally {await capture.close();}
 });
 
-test('the requested viewport and density reach the official runtime', async () => {
-  let received: { width: number; height: number } | undefined;
-  const scales: number[] = [];
+test('the requested viewport, density, and emulation reach the official runtime', async () => {
+  let received: { width: number; height: number } | null | undefined;
+  const scales: (number | undefined)[] = [];
+  let last: import('playwright').BrowserContextOptions | undefined;
   const fakeContext = { close: async () => {}, newPage: async () => ({ setDefaultTimeout() {}, setDefaultNavigationTimeout() {}, goto: async () => null,
     locator: () => { throw new Error('Unexpected target lookup'); }, waitForSelector: async () => null, waitForTimeout: async () => {}, frames: () => [], evaluate: async () => 0, screenshot: async () => Buffer.from('fake') }) };
   const capture = createCaptureService({ settleMs: 0, adguardFactory: async (categories, options) => {
-    received = options.viewport;
-    scales.push(options.scale);
+    last = options.contextOptions;
+    received = options.contextOptions.viewport;
+    scales.push(options.contextOptions.deviceScaleFactor);
     return { context: fakeContext, close: async () => {}, metadata: { engine: 'adguard-api-mv3', package: 'test', referenceVersion: 'test', rulesVersion: 'test', filters: [18, 19], rulesCount: 0, setupMs: 0 } };
   } });
   try {
@@ -72,6 +74,16 @@ test('the requested viewport and density reach the official runtime', async () =
     await capture({ url: 'https://example.com', cleanup: 'standard' });
     assert.deepEqual(received, { width: 1920, height: 1080 });
     assert.deepEqual(scales, [1, 2]);
+    assert.equal(last?.isMobile, undefined);
+    assert.equal(last?.locale, undefined);
+    assert.equal(last?.timezoneId, undefined);
+    await capture({ url: 'https://example.com', cleanup: 'standard', device: 'iphone_15', locale: 'de-DE', timezone: 'Europe/Berlin', colorScheme: 'dark', reducedMotion: true });
+    assert.deepEqual(received, { width: 393, height: 659 });
+    assert.equal(scales.at(-1), 3);
+    assert.equal(last?.isMobile, true);
+    assert.equal(last?.hasTouch, true);
+    assert.match(last?.userAgent ?? '', /iPhone/);
+    assert.deepEqual([last?.locale, last?.timezoneId, last?.colorScheme, last?.reducedMotion], ['de-DE', 'Europe/Berlin', 'dark', 'reduce']);
   } finally { await capture.close(); }
 });
 
@@ -125,7 +137,7 @@ test('native cleanup loads from a checkout path containing spaces and Unicode', 
     await writeFile(resolve(project, 'package.json'), '{"type":"module"}');
     await symlink(fileURLToPath(new URL('../../../node_modules', import.meta.url)), resolve(project, 'node_modules'), 'dir');
     await symlink(fileURLToPath(new URL('../../../.cache/adguard-runtime/extension', import.meta.url)), resolve(cache, 'extension'), 'dir');
-    for (const name of ['adguard-context.ts', 'options.ts', 'output.ts']) {
+    for (const name of ['adguard-context.ts', 'options.ts', 'output.ts', 'emulation.ts']) {
       await copyFile(new URL(`../src/services/${name}`, import.meta.url), resolve(services, name));
     }
     const { createAdguardContext: createFromCheckout } = await import(pathToFileURL(resolve(services, 'adguard-context.ts')).href) as typeof import('../src/services/adguard-context.ts');

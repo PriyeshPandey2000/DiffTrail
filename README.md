@@ -8,7 +8,8 @@ Built with TypeScript, Playwright, and AdGuard. Runs in headless Chromium by def
 
 - Viewport, full-page, element, and rectangle screenshots.
 - PNG, JPEG, and WebP output with quality controls for JPEG and WebP.
-- Custom viewport sizes and 1× or 2× pixel density.
+- Custom viewport sizes and pixel density from 1× to 5×.
+- Mobile and tablet device presets, dark mode, custom user agent, locale, and time zone.
 - Cookie-banner, popup, ad, and other filtering categories.
 - Page readiness controls: selector waits, delays, and lazy-load scrolling.
 - Capture and cleanup metadata in response headers.
@@ -85,7 +86,15 @@ See [element and rectangle capture](docs/api.md#element-and-rectangle-capture) f
 {"url":"https://example.com","format":"webp","quality":75,"viewport":{"width":1280,"height":720},"scale":1}
 ```
 
-Use `format:"jpeg"` for JPEG output. `quality` applies only to JPEG and WebP. `scale:1` produces one image pixel per CSS pixel; `scale:2` doubles each output dimension without changing the CSS viewport.
+Use `format:"jpeg"` for JPEG output. `quality` applies only to JPEG and WebP. `scale:1` produces one image pixel per CSS pixel; `scale:2` (the default) doubles each output dimension without changing the CSS viewport. `scale` accepts any number from 1 to 5.
+
+### Take a mobile screenshot
+
+```json
+{"url":"https://example.com","device":"iphone_15","colorScheme":"dark","locale":"de-DE","timezone":"Europe/Berlin"}
+```
+
+`device` sets the viewport, pixel density, touch support, and user agent of a phone or tablet. `GET /api/devices` lists the presets. See [device and browser emulation](docs/api.md#device-and-browser-emulation) for all options.
 
 ### Wait for dynamic content
 
@@ -123,6 +132,7 @@ Filtering varies by site and can change page content or layout. AdGuard's cookie
 - [API reference](docs/api.md): request options, defaults, headers, errors, and limits.
 - [Element and rectangle capture](docs/api.md#element-and-rectangle-capture).
 - [Loading controls](docs/api.md#loading-controls).
+- [Device and browser emulation](docs/api.md#device-and-browser-emulation).
 - [Deployment notes](docs/api.md#errors-and-resource-limits): the server currently binds to loopback for local use.
 
 ## Development

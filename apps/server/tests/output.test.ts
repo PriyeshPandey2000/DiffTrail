@@ -65,7 +65,7 @@ test('invalid output options are rejected', () => {
     { fullPage: 'true' }, { fullPage: 1 }, { fullPage: null },
     { viewport: 1280 }, { viewport: null }, { viewport: [] }, { viewport: { width: 199 } }, { viewport: { width: 3841 } },
     { viewport: { height: 199 } }, { viewport: { height: 4321 } }, { viewport: { width: 1280.5 } }, { viewport: { width: '1280' } },
-    { viewport: { depth: 1 } }, { scale: 0 }, { scale: 3 }, { scale: "2" }, { scale: null },
+    { viewport: { depth: 1 } }, { scale: 0 }, { scale: 5.01 }, { scale: "2" }, { scale: null },
     { maxHeight: 100 }, { fullPage: true, maxHeight: 0 }, { fullPage: true, maxHeight: 100001 }, { fullPage: true, maxHeight: "100" },
   ];
   for (const extra of bad) assert.throws(() => normalizeOptions({ url: origin, ...extra as object }), { code: 'INVALID_OPTIONS' }, JSON.stringify(extra));
