@@ -104,6 +104,8 @@ export interface ImageOutput {
   viewport: Viewport;
   // CSS px height of the page; only measured for full-page captures.
   pageHeight?: number;
+  // CSS px width of a full-page capture when it differs from viewport.width (zoomed-out mobile layout).
+  captureWidth?: number;
   truncated: boolean;
   truncationReasons?: ('max-height' | 'format-limit' | 'pixel-budget')[];
 }

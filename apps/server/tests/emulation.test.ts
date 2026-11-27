@@ -35,6 +35,17 @@ before(async () => {
       req.on('end', () => { reports.push({ headers: pending.headers ?? {}, page: JSON.parse(body) }); res.end(); });
       return;
     }
+    if (req.url === '/slow.svg') {
+      setTimeout(() => { if (!res.destroyed) { res.setHeader('Content-Type', 'image/svg+xml'); res.end('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="green"/></svg>'); } }, 400);
+      return;
+    }
+    if (req.url === '/wide' || req.url === '/wide-image') {
+      // No viewport meta tag: mobile browsers lay this out 980 CSS px wide and zoom out.
+      res.setHeader('Content-Type', 'text/html');
+      res.end('<!doctype html><body style="margin:0;height:2500px"><div style="position:absolute;left:800px;top:100px;width:150px;height:150px;background:rgb(255,0,0)"></div>'
+        + (req.url === '/wide-image' ? '<img src="/slow.svg" width="100" height="100" style="position:absolute;left:600px;top:20px">' : '') + '</body>');
+      return;
+    }
     pending = { headers: { userAgent: req.headers['user-agent'], acceptLanguage: req.headers['accept-language'] } };
     res.setHeader('Content-Type', 'text/html');
     res.end(probe);
@@ -160,6 +171,32 @@ test('fractional device density renders at that density', async () => {
   assert.equal(report.page.ratio, 2.75);
   assert.equal(result.image.readUInt32BE(16), Math.round(393 * 2.75));
   assert.equal(result.metadata.output.scale, 2.75);
+});
+
+test('full-page capture of a zoomed-out mobile layout keeps the whole visible width', async () => {
+  const capture = createCaptureService({ cleanupEngine: 'cosmetic', settleMs: 0 });
+  try {
+    const result = await capture({ url: `${origin}/wide`, device: 'iphone_15', fullPage: true, scale: 1 });
+    // The page is laid out 980 CSS px wide, so the content at x=800 must be in the image.
+    assert.equal(result.image.readUInt32BE(16), 980);
+    assert.equal(result.image.readUInt32BE(20), 2500);
+    assert.equal(result.metadata.output.captureWidth, 980);
+    assert.equal(result.metadata.output.truncated, false);
+    // Desktop captures keep the configured width.
+    const desktop = await capture({ url: `${origin}/wide`, fullPage: true, scale: 1, viewport: { width: 1280, height: 720 } });
+    assert.equal(desktop.image.readUInt32BE(16), 1280);
+    assert.equal('captureWidth' in desktop.metadata.output, false);
+  } finally { await capture.close(); }
+});
+
+test('image readiness counts images visible in a zoomed-out mobile viewport', async () => {
+  const capture = createCaptureService({ cleanupEngine: 'cosmetic', settleMs: 0 });
+  try {
+    const result = await capture({ url: `${origin}/wide-image`, device: 'iphone_15', waitUntil: 'domcontentloaded', scale: 1 });
+    // The image at x=600 is outside 393 CSS px but inside the zoomed-out view, so it is waited for.
+    assert.equal(result.metadata.loading.images?.loaded, 1);
+    assert.equal(result.metadata.loading.images?.state, 'ready');
+  } finally { await capture.close(); }
 });
 
 test('GET /api/devices lists presets with their capture density', async () => {

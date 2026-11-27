@@ -52,10 +52,14 @@ export async function waitForImages(page: CapturePage, options: CaptureOptions, 
       const counts = await page.evaluate(({ fullPage, height, width, region }) => {
         const all = document.querySelectorAll('img');
         const counts = { loaded: 0, failed: 0, pending: 0, untriggered: 0, limited: all.length > 10_000 };
+        // A zoomed-out mobile layout shows more than the configured viewport in CSS px.
+        const zoomed = window.visualViewport && window.visualViewport.scale < 0.999 ? window.visualViewport : null;
+        const visibleWidth = zoomed ? Math.max(width, zoomed.width) : width;
+        const visibleHeight = zoomed && !fullPage ? Math.max(height, zoomed.height) : height;
         const top = region?.y ?? (fullPage ? 0 : scrollY);
         const left = region?.x ?? 0;
-        const right = left + (region?.width ?? width);
-        const bottom = top + (region?.height ?? height);
+        const right = left + (region?.width ?? visibleWidth);
+        const bottom = top + (region?.height ?? visibleHeight);
         for (let i = 0; i < Math.min(all.length, 10_000); i++) {
           const image = all[i];
           const box = image.getBoundingClientRect();
