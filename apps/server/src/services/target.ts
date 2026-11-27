@@ -75,8 +75,8 @@ export async function renderTarget(page: CapturePage, options: CaptureOptions, t
   const { width, height } = bounds;
   const side = MAX_FORMAT_SIDE[options.format];
   // Native element screenshots enclose fractional CSS bounds in whole pixels.
-  const outputWidth = (Math.ceil(bounds.x + width) - Math.floor(bounds.x)) * options.scale;
-  const outputHeight = (Math.ceil(bounds.y + height) - Math.floor(bounds.y)) * options.scale;
+  const outputWidth = Math.ceil((Math.ceil(bounds.x + width) - Math.floor(bounds.x)) * options.scale);
+  const outputHeight = Math.ceil((Math.ceil(bounds.y + height) - Math.floor(bounds.y)) * options.scale);
   if (outputWidth > side || outputHeight > side || outputWidth * outputHeight > MAX_OUTPUT_PIXELS) {
     throw new CaptureError('TARGET_TOO_LARGE', 'The requested target exceeds the format or output-pixel limit. Reduce its size, use scale:1, or choose another format.', 422);
   }
